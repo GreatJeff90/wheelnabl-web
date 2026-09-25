@@ -54,7 +54,7 @@ export default function Hero() {
         {/* Right Side: Store Badges & Launch CTAs */}
         <div className="md:col-span-3 flex flex-col items-center md:items-start text-center md:text-left space-y-4 order-3">
           <p className="text-xs text-slate-500 max-w-[200px] leading-relaxed">
-            Move seamlessly between Gulf Estate and any spot in Port Harcourt.
+            Move seamlessly within Gulf Estate.
           </p>
 
           <div className="flex flex-col sm:flex-row md:flex-col gap-2.5 w-full max-w-[200px]">

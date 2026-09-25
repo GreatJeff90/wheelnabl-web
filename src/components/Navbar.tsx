@@ -9,9 +9,9 @@ export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navLinks = [
-    { label: 'About', href: '#about' },
-    { label: 'Services', href: '#services' },
-    { label: 'How it Works', href: '#how-it-works' },
+    { label: 'Why Wheelnabl', href: '#services' },
+    { label: 'How It Works', href: '#how-it-works' },
+    { label: 'Portal', href: '/dashboard' },
   ];
 
   return (
