@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-// import Sidebar, { DashboardTab } from '@/components/dashboard/Sidebar';
 import {
   Wallet,
   MapPin,
@@ -20,6 +19,7 @@ import {
   CreditCard,
   CheckCircle2,
   AlertCircle,
+  ArrowRight,
 } from 'lucide-react';
 
 interface Profile {
@@ -30,7 +30,7 @@ interface Profile {
 }
 
 const ESTATE_LOCATIONS = [
-  'Golf Estate Main Gate',
+  'Gulf Estate Main Gate',
   'Phase 1 Gatehouse',
   'Phase 2 Gatehouse',
   'Clubhouse & Recreation Center',
@@ -69,21 +69,29 @@ const RECENT_TRIPS = [
 
 type ModalStage = 'confirming' | 'searching' | 'assigned';
 
+const FUNDING_PRESETS = [500, 1000, 2500, 5000, 10000];
+
 export default function DashboardPage() {
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  // const [activeTab, setActiveTab] = useState<DashboardTab>('home');
 
   // Form State
   const [pickup, setPickup] = useState(ESTATE_LOCATIONS[0]);
   const [dropoff, setDropoff] = useState(ESTATE_LOCATIONS[3]);
   const [serviceType, setServiceType] = useState<'shuttle' | 'private'>('shuttle');
 
-  // Active Dispatch & Payment Modal State
+  // Active Dispatch & Ride Payment Modal State
   const [activeModalOpen, setActiveModalOpen] = useState(false);
   const [modalStage, setModalStage] = useState<ModalStage>('confirming');
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+
+  // Add Funds Modal State (Bachs Integration)
+  const [isAddFundsOpen, setIsAddFundsOpen] = useState(false);
+  const [fundAmount, setFundAmount] = useState<number>(1000);
+  const [customFundAmount, setCustomFundAmount] = useState<string>('');
+  const [isProcessingFunding, setIsProcessingFunding] = useState(false);
+  const [fundingError, setFundingError] = useState<string | null>(null);
 
   const numericFare = serviceType === 'shuttle' ? 500 : 2500;
   const tripFareFormatted = serviceType === 'shuttle' ? '₦500' : '₦2,500';
@@ -113,7 +121,7 @@ export default function DashboardPage() {
             id: user.id,
             email: user.email || '',
             full_name: user.user_metadata?.full_name || 'Resident',
-            wallet_balance: 1500, // Demo starting balance
+            wallet_balance: 1500,
           });
         } else {
           setProfile(profileData);
@@ -128,7 +136,41 @@ export default function DashboardPage() {
     loadUserData();
   }, [router]);
 
-  // Step 1: Open Confirmation & Payment Drawer
+  // Handle successful Bachs payment redirect and credit wallet in Supabase
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const query = new URLSearchParams(window.location.search);
+    const paymentStatus = query.get('payment');
+    const creditedAmount = query.get('amount');
+
+    if (paymentStatus === 'success' && creditedAmount && profile) {
+      const addedVal = Number(creditedAmount);
+      const targetUserId = profile.id;
+      const currentBalance = profile.wallet_balance ?? 0;
+      const newBalance = currentBalance + addedVal;
+
+      async function creditWallet() {
+        // Persist to Supabase
+        await supabase
+          .from('profiles')
+          .update({ wallet_balance: newBalance })
+          .eq('id', targetUserId);
+
+        setProfile((prev) =>
+          prev ? { ...prev, wallet_balance: newBalance } : null
+        );
+
+        // Clean query parameters from URL
+        window.history.replaceState({}, '', '/dashboard');
+        alert(`Successfully funded wallet with ₦${addedVal.toLocaleString()} via Bachs!`);
+      }
+
+      creditWallet();
+    }
+  }, [profile]);
+  
+  // Step 1: Open Confirmation & Ride Payment Drawer
   const handleOpenBookingSummary = () => {
     if (pickup === dropoff) {
       alert('Pickup and drop-off cannot be the same point in the estate.');
@@ -148,7 +190,6 @@ export default function DashboardPage() {
     setIsProcessingPayment(true);
 
     try {
-      // Deduct balance locally (and update profile in state)
       const updatedBalance = (profile?.wallet_balance ?? 0) - numericFare;
 
       if (profile?.id) {
@@ -162,10 +203,8 @@ export default function DashboardPage() {
         prev ? { ...prev, wallet_balance: updatedBalance } : null
       );
 
-      // Transition to vehicle searching
       setModalStage('searching');
 
-      // Driver assigned after brief dispatch simulation
       setTimeout(() => {
         setModalStage('assigned');
         setIsProcessingPayment(false);
@@ -183,6 +222,47 @@ export default function DashboardPage() {
     setIsProcessingPayment(false);
   };
 
+  // Step 3: Trigger Bachs Gateway for Wallet Funding
+  const handleInitiateAddFunds = async () => {
+    const finalAmount = customFundAmount ? Number(customFundAmount) : fundAmount;
+
+    if (!finalAmount || finalAmount < 100) {
+      setFundingError('Minimum wallet top-up is ₦100');
+      return;
+    }
+
+    setIsProcessingFunding(true);
+    setFundingError(null);
+
+    try {
+      const res = await fetch('/api/funds/bachs/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: finalAmount,
+          email: profile?.email || 'resident@gulfestate.ng',
+          userId: profile?.id,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to initialize Bachs payment session');
+      }
+
+      if (data.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+      } else {
+        throw new Error('No checkout URL returned from Bachs.');
+      }
+    } catch (err: unknown) {
+      console.error('Add funds error:', err);
+      setFundingError((err as Error).message || 'Could not connect to payment gateway. Try again.');
+      setIsProcessingFunding(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -191,12 +271,11 @@ export default function DashboardPage() {
     );
   }
 
+  const effectiveFundingAmount = customFundAmount ? Number(customFundAmount) : fundAmount;
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex font-sans selection:bg-teal-100 selection:text-teal-900 overflow-hidden">
-      {/* ── 1. Reusable Left Sidebar Component ────────────────────── */}
-      {/* <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} /> */}
-
-      {/* ── 2. Main Content Area ──────────────────────────────────── */}
+      {/* ── Main Content Area ──────────────────────────────────── */}
       <main className="flex-1 p-6 sm:p-10 max-w-4xl mx-auto space-y-8 overflow-y-auto">
         
         {/* Account Balance Card */}
@@ -210,13 +289,16 @@ export default function DashboardPage() {
               ₦{(profile?.wallet_balance ?? 0).toLocaleString('en-NG', { minimumFractionDigits: 2 })}
             </h2>
             <p className="text-[11px] text-slate-500 mt-1">
-              Auto-deducted for internal Golf Estate trips
+              Auto-deducted for internal Gulf Estate trips
             </p>
           </div>
 
           <button
             type="button"
-            onClick={() => alert('Paystack funding gateway opens here')}
+            onClick={() => {
+              setFundingError(null);
+              setIsAddFundsOpen(true);
+            }}
             className="flex items-center gap-2 bg-[#004B4F] hover:bg-[#00383b] text-white text-xs font-bold px-5 py-3 rounded-full transition shadow-md shadow-teal-950/10 active:scale-95 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
@@ -360,6 +442,117 @@ export default function DashboardPage() {
 
       </main>
 
+      {/* ── 2. Bachs "Add Funds" Modal ──────────────────────────── */}
+      {isAddFundsOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-slate-100 space-y-6 animate-in fade-in zoom-in-95 duration-150">
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="space-y-0.5">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-teal-50 border border-teal-100 text-[10px] font-bold text-[#004B4F]">
+                  <Zap className="w-3 h-3 fill-current" />
+                  <span>Instant Top-Up</span>
+                </div>
+                <h3 className="text-base font-bold text-slate-900 pt-1">
+                  Fund Transit Wallet
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddFundsOpen(false)}
+                aria-label="Close add funds"
+                className="p-1 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Presets */}
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-2">
+                  Select Preset Amount
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {FUNDING_PRESETS.map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => {
+                        setFundAmount(preset);
+                        setCustomFundAmount('');
+                      }}
+                      className={`py-2 rounded-xl font-bold text-xs transition cursor-pointer ${
+                        effectiveFundingAmount === preset && !customFundAmount
+                          ? 'bg-[#004B4F] text-white shadow-xs'
+                          : 'bg-slate-50 border border-slate-200 text-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      ₦{preset.toLocaleString()}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Custom Input */}
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
+                  Or Custom Amount (₦)
+                </label>
+                <div className="flex items-center bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 focus-within:border-[#004B4F] focus-within:bg-white transition">
+                  <span className="text-slate-400 font-bold text-sm mr-2">₦</span>
+                  <input
+                    type="number"
+                    min="100"
+                    step="50"
+                    placeholder="e.g. 3500"
+                    value={customFundAmount}
+                    onChange={(e) => setCustomFundAmount(e.target.value)}
+                    className="bg-transparent outline-none w-full text-slate-900 font-bold text-sm"
+                  />
+                </div>
+              </div>
+
+              {fundingError && (
+                <div className="flex items-center gap-2 p-3 bg-rose-50 border border-rose-100 rounded-xl text-xs text-rose-600 font-semibold">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{fundingError}</span>
+                </div>
+              )}
+
+              {/* Supported Rails Notice */}
+              <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+                <div className="flex items-center gap-2">
+                  <CreditCard className="w-4 h-4 text-[#004B4F]" />
+                  <span>Powered by Bachs Gateway</span>
+                </div>
+                <span className="font-bold text-slate-700">Cards & Transfers</span>
+              </div>
+
+              {/* Submit */}
+              <button
+                type="button"
+                disabled={isProcessingFunding}
+                onClick={handleInitiateAddFunds}
+                className="w-full bg-[#FF7A00] hover:bg-[#e66e00] text-white text-xs font-bold py-3.5 rounded-full transition shadow-md shadow-orange-500/20 active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {isProcessingFunding ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Connecting to Bachs...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Pay ₦{effectiveFundingAmount.toLocaleString()} with Bachs</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── 3. Unified Ride Confirmation & Dispatch Modal ─────────── */}
       {activeModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
@@ -438,10 +631,13 @@ export default function DashboardPage() {
                     </div>
                     <button
                       type="button"
-                      onClick={() => alert('Paystack funding gateway opens here')}
-                      className="w-full bg-[#004B4F] text-white text-xs font-bold py-3.5 rounded-full shadow-md transition hover:bg-[#00383b]"
+                      onClick={() => {
+                        setActiveModalOpen(false);
+                        setIsAddFundsOpen(true);
+                      }}
+                      className="w-full bg-[#004B4F] text-white text-xs font-bold py-3.5 rounded-full shadow-md transition hover:bg-[#00383b] cursor-pointer"
                     >
-                      Top Up Wallet via Paystack
+                      Top Up Wallet via Bachs
                     </button>
                   </div>
                 ) : (
@@ -490,7 +686,6 @@ export default function DashboardPage() {
             {/* STAGE 3: Matched, Paid & Call Driver */}
             {modalStage === 'assigned' && (
               <div className="space-y-5">
-                {/* Driver Info & Immediate Call Button */}
                 <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-100">
                   <div className="flex items-center gap-3">
                     <div className="w-11 h-11 rounded-full bg-[#004B4F] text-white flex items-center justify-center font-bold text-sm shadow-sm">
@@ -502,7 +697,6 @@ export default function DashboardPage() {
                     </div>
                   </div>
 
-                  {/* Call Driver Button */}
                   <a
                     href="tel:+2348000000000"
                     className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-xs"
@@ -512,7 +706,6 @@ export default function DashboardPage() {
                   </a>
                 </div>
 
-                {/* Verification PIN & ETA */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="p-3.5 rounded-2xl bg-teal-50 border border-teal-100 text-center">
                     <span className="text-[10px] font-bold text-teal-800 uppercase tracking-wider block">
@@ -530,7 +723,6 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
-                {/* Paid Status & Gate Pass Confirmation */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-xs px-3 py-2 rounded-xl bg-slate-50 border border-slate-100">
                     <span className="text-slate-500">Payment Status:</span>
@@ -547,7 +739,7 @@ export default function DashboardPage() {
               </div>
             )}
 
-            {/* Cancel Button */}
+            {/* Cancel / Dismiss Button */}
             <button
               type="button"
               onClick={handleCancelTrip}
