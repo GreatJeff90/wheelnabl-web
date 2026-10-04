@@ -16,7 +16,7 @@ const STEPS: Step[] = [
     icon: <Smartphone className="w-5 h-5 text-[#004B4F]" />,
     title: 'Pin Your Location',
     description:
-      'Choose your pickup street, phase, or gatehouse inside Gulf Estate directly from your phone.',
+      'Choose your pickup street, phase, or gatehouse inside Golf Estate directly from your phone.',
   },
   {
     step: 'Step 02',
@@ -50,7 +50,7 @@ export default function HowItWorks() {
             </h2>
           </div>
           <p className="max-w-md text-sm sm:text-base text-slate-500 font-normal leading-relaxed">
-            Designed exclusively for Gulf Estate. Getting from your doorstep to the gate or clubhouse takes less than a minute.
+            Designed exclusively for Golf Estate. Getting from your doorstep to the gate or clubhouse takes less than a minute.
           </p>
         </div>
 

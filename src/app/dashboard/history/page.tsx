@@ -39,7 +39,7 @@ interface TripTransaction {
 const SAMPLE_TRANSACTIONS: TripTransaction[] = [
   {
     id: 'tx-0',
-    txHash: '0x84f9...gulf01b3',
+    txHash: '0x84f9...Golf01b3',
     title: 'Estate Electric Shuttle',
     pickup: 'Phase 1 Gatehouse',
     dropoff: 'Clubhouse & Sports Courts',
@@ -57,7 +57,7 @@ const SAMPLE_TRANSACTIONS: TripTransaction[] = [
     txHash: '0x68b7...438aefd35',
     title: 'Private EV Direct',
     pickup: 'Road 4 Residential Zone',
-    dropoff: 'Gulf Estate Main Gate',
+    dropoff: 'Golf Estate Main Gate',
     date: 'Yesterday at 6:40 PM',
     amount: '₦2,500.00',
     subAmount: '- 2,500 NGN',

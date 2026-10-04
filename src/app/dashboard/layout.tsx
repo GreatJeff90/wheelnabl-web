@@ -4,7 +4,7 @@ import DashboardHeader from '@/components/dashboard/DashboardHeader';
 
 export const metadata: Metadata = {
   title: 'Dashboard | Wheelnabl',
-  description: 'Intra-estate electric vehicle transit system for Gulf Estate',
+  description: 'Intra-estate electric vehicle transit system for Golf Estate',
 };
 
 export default function DashboardLayout({

@@ -45,7 +45,7 @@ const FLEET_DATA: FleetDriver[] = [
     status: 'active_transit',
     rate: '₦500.00',
     estimatedArrival: '2 mins away',
-    hashId: '0x84f9...gulf01b3',
+    hashId: '0x84f9...Golf01b3',
   },
   {
     id: 'ev-1',
@@ -160,7 +160,7 @@ export default function RidesPage() {
             </button>
             <button
               title="Estate Support"
-              onClick={() => alert('Gulf Estate Security Desk: +234 800 000 0000')}
+              onClick={() => alert('Golf Estate Security Desk: +234 800 000 0000')}
               className="text-slate-400 hover:text-slate-700 transition cursor-pointer"
             >
               <HelpCircle className="w-4 h-4" />
@@ -357,7 +357,7 @@ export default function RidesPage() {
                 {/* Pre-Cleared Barrier Clearance */}
                 <div className="flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 p-3 rounded-2xl">
                   <ShieldCheck className="w-4 h-4 shrink-0 text-emerald-600" />
-                  <span>Gulf Estate Security Pass Verified</span>
+                  <span>Golf Estate Security Pass Verified</span>
                 </div>
               </div>
 

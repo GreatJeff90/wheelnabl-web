@@ -34,7 +34,7 @@ export default function Hero() {
             simplified for you.
           </p>
           <span className="inline-block mt-3 text-xs font-semibold text-teal-800 bg-teal-50 border border-teal-100/60 px-3 py-1 rounded-full">
-            Gulf Estate • Port Harcourt
+            Golf Estate • Port Harcourt
           </span>
         </div>
 
@@ -54,7 +54,7 @@ export default function Hero() {
         {/* Right Side: Store Badges & Launch CTAs */}
         <div className="md:col-span-3 flex flex-col items-center md:items-start text-center md:text-left space-y-4 order-3">
           <p className="text-xs text-slate-500 max-w-[200px] leading-relaxed">
-            Move seamlessly within Gulf Estate.
+            Move seamlessly within Golf Estate.
           </p>
 
           <div className="flex flex-col sm:flex-row md:flex-col gap-2.5 w-full max-w-[200px]">

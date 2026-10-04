@@ -44,7 +44,7 @@ export default function ProfilePage() {
     email: '',
     full_name: 'Resident Member',
     phone: 'Not provided',
-    estate_zone: 'Gulf Estate, Phase 1',
+    estate_zone: 'Golf Estate, Phase 1',
     house_number: 'Unassigned Plot',
     reg_date: 'Recently Registered',
     wallet_balance: 0,
@@ -95,7 +95,7 @@ export default function ProfilePage() {
         const resolvedZone =
           dbProfile?.estate_zone ||
           user.user_metadata?.estate_zone ||
-          'Gulf Estate, Phase 1';
+          'Golf Estate, Phase 1';
 
         const resolvedHouse =
           dbProfile?.house_number ||
@@ -163,7 +163,7 @@ export default function ProfilePage() {
           <div className="flex items-center gap-3">
             <span className="text-xs font-semibold px-3 py-1 bg-white border border-slate-200/80 rounded-full text-emerald-700 flex items-center gap-1.5 shadow-2xs">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-              Verified Gulf Resident
+              Verified Golf Resident
             </span>
           </div>
         </div>
@@ -197,7 +197,7 @@ export default function ProfilePage() {
                     {profile.full_name}
                   </h2>
                   <p className="text-xs text-slate-400 font-medium mt-0.5">
-                    Gulf Estate Registered Fast-Pass Transit ID
+                    Golf Estate Registered Fast-Pass Transit ID
                   </p>
                 </div>
 
@@ -322,7 +322,7 @@ export default function ProfilePage() {
                 <span className="absolute -left-6 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-3 border-white bg-slate-400 shadow-xs" />
                 <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/70 flex items-center justify-between gap-4">
                   <div>
-                    <h4 className="text-xs font-bold text-slate-900">Residence → Gulf Estate Clubhouse</h4>
+                    <h4 className="text-xs font-bold text-slate-900">Residence → Golf Estate Clubhouse</h4>
                     <p className="text-[11px] text-slate-500 mt-0.5">Gym, swimming pool & tennis court access</p>
                     <span className="text-[10px] font-bold text-slate-700 mt-1 inline-block">₦500 Flat Shuttle</span>
                   </div>

@@ -45,7 +45,7 @@ const AUDIENCE: AudienceItem[] = [
     subtitle: 'Verified Drivers & Speed Caps',
     badge: 'Estate-Safe Speed',
     description:
-      'Safe, reliable transport for school pickups at the front gate or trips to children’s play parks inside Gulf Estate without relying on unpredictable external operators.',
+      'Safe, reliable transport for school pickups at the front gate or trips to children’s play parks inside Golf Estate without relying on unpredictable external operators.',
     keyFeature: 'Internal Pre-Cleared Security Protocol',
     highlightColor: 'bg-[#183B32]',
     textColor: 'text-white',
@@ -118,7 +118,7 @@ export default function WhosItFor() {
           {/* Left Column: Title & Hook */}
           <div className="lg:col-span-4 text-center lg:text-left">
             <span className="text-xs font-bold uppercase tracking-widest text-[#FF7A00]">
-              Built for Gulf Estate
+              Built for Golf Estate
             </span>
             <h2 className="text-4xl sm:text-5xl font-black text-slate-900 tracking-tight mt-2 leading-[1.1]">
               Who Is <br className="hidden lg:block" />
@@ -193,7 +193,7 @@ export default function WhosItFor() {
                     <span>{activeItem.keyFeature}</span>
                   </div>
                   <p className="text-[10px] text-white/50 mt-1 uppercase tracking-widest font-mono">
-                    Gulf Estate Fleet Protocol
+                    Golf Estate Fleet Protocol
                   </p>
                 </div>
               </div>
@@ -212,7 +212,7 @@ export default function WhosItFor() {
                 {activeItem.title}
               </h4>
               <p className="text-xs text-slate-500 mt-1">
-                Optimized for Gulf Estate gates, residences, and internal avenues.
+                Optimized for Golf Estate gates, residences, and internal avenues.
               </p>
             </div>
 

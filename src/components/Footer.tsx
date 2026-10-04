@@ -23,7 +23,7 @@ export default function Footer() {
               />
             </Link>
             <p className="text-sm text-slate-500 max-w-sm leading-relaxed">
-              Quiet, zero-emission intra-estate transit engineered exclusively for Gulf Estate, Port Harcourt. Moving residents with safety and ease.
+              Quiet, zero-emission intra-estate transit engineered exclusively for Golf Estate, Port Harcourt. Moving residents with safety and ease.
             </p>
             <div className="flex items-center gap-3 pt-2">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-100">
@@ -98,7 +98,7 @@ export default function Footer() {
             <ul className="space-y-2.5 text-sm text-slate-500">
               <li className="flex items-start gap-2.5">
                 <MapPin className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-                <span>Gulf Estate, Peter Odili Rd, Port Harcourt</span>
+                <span>Golf Estate, Peter Odili Rd, Port Harcourt</span>
               </li>
               <li className="flex items-center gap-2.5">
                 <Phone className="w-4 h-4 text-slate-400 shrink-0" />

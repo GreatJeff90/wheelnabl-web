@@ -11,7 +11,7 @@ const poppins = Poppins({
 
 export const metadata: Metadata = {
   title: 'Wheelnabl | Estate Mobility',
-  description: 'Smart transit system for Gulf Estate',
+  description: 'Smart transit system for Golf Estate',
   icons: {
     icon: '/logo.ico',
   },

@@ -87,7 +87,7 @@ export default function DashboardHeader() {
           {/* Estate Clearance Badge */}
           <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-teal-50 border border-teal-100/80 text-[11px] font-bold text-[#004B4F]">
             <ShieldCheck className="w-3.5 h-3.5 text-[#004B4F]" />
-            <span>Gulf Estate Transit</span>
+            <span>Golf Estate Transit</span>
           </div>
 
           {/* Notification Trigger */}

@@ -17,7 +17,7 @@ const CARDS: ProblemCard[] = [
     icon: <Zap className="w-6 h-6" />,
     title: '100% Electric Fleet',
     description:
-      'Eliminating noisy exhaust fumes and fuel pollution. Our custom zero-emission electric cabs ensure Gulf Estate remains serene, clean, and quiet day and night.',
+      'Eliminating noisy exhaust fumes and fuel pollution. Our custom zero-emission electric cabs ensure Golf Estate remains serene, clean, and quiet day and night.',
     isFeatured: true,
   },
   {
@@ -56,7 +56,7 @@ export default function ProblemsSolving() {
               Why Wheelnabl?
             </h2>
             <p className="mt-4 text-sm sm:text-base text-slate-600 leading-relaxed font-normal">
-              Internal mobility reimagined for Gulf Estate residents. Experience reliable, zero-emission intra-estate transit engineered around resident comfort, cleanliness, and peace of mind.
+              Internal mobility reimagined for Golf Estate residents. Experience reliable, zero-emission intra-estate transit engineered around resident comfort, cleanliness, and peace of mind.
             </p>
           </div>
 

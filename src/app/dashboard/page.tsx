@@ -30,7 +30,7 @@ interface Profile {
 }
 
 const ESTATE_LOCATIONS = [
-  'Gulf Estate Main Gate',
+  'Golf Estate Main Gate',
   'Phase 1 Gatehouse',
   'Phase 2 Gatehouse',
   'Clubhouse & Recreation Center',
@@ -52,7 +52,7 @@ const RECENT_TRIPS = [
   {
     id: 'TRP-103',
     pickup: 'Road 4 Residential Zone',
-    dropoff: 'Gulf Estate Main Gate',
+    dropoff: 'Golf Estate Main Gate',
     date: 'Yesterday, 6:40 PM',
     fare: '₦2,500',
     type: 'Private EV',
@@ -192,7 +192,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex font-sans selection:bg-teal-100 selection:text-teal-900">
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex font-sans selection:bg-teal-100 selection:text-teal-900 overflow-hidden">
       {/* ── 1. Reusable Left Sidebar Component ────────────────────── */}
       {/* <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} /> */}
 
@@ -210,7 +210,7 @@ export default function DashboardPage() {
               ₦{(profile?.wallet_balance ?? 0).toLocaleString('en-NG', { minimumFractionDigits: 2 })}
             </h2>
             <p className="text-[11px] text-slate-500 mt-1">
-              Auto-deducted for internal Gulf Estate trips
+              Auto-deducted for internal Golf Estate trips
             </p>
           </div>
 
@@ -311,7 +311,7 @@ export default function DashboardPage() {
             onClick={handleOpenBookingSummary}
             className="w-full bg-[#FF7A00] hover:bg-[#e66e00] text-white text-xs font-bold py-3.5 rounded-full transition shadow-md shadow-orange-500/20 active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer mt-2"
           >
-            <span>Proceed to Confirmation & Payment ({tripFareFormatted})</span>
+            <span>Confirm Payment ({tripFareFormatted})</span>
             <ArrowUpRight className="w-4 h-4" />
           </button>
         </div>
@@ -371,7 +371,7 @@ export default function DashboardPage() {
                 <span className={`w-2.5 h-2.5 rounded-full ${modalStage === 'confirming' ? 'bg-amber-500' : 'bg-emerald-500 animate-pulse'}`} />
                 <h3 className="text-sm font-bold text-slate-900">
                   {modalStage === 'confirming' && 'Confirm Ride & Pay'}
-                  {modalStage === 'searching' && 'Locating Gulf Estate EV...'}
+                  {modalStage === 'searching' && 'Locating Golf Estate EV...'}
                   {modalStage === 'assigned' && 'Cab En Route • Paid'}
                 </h3>
               </div>
