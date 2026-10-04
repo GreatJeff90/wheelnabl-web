@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import Sidebar, { DashboardTab } from '@/components/dashboard/Sidebar';
+// import Sidebar, { DashboardTab } from '@/components/dashboard/Sidebar';
 import {
   Car,
   Zap,
@@ -104,7 +104,7 @@ const FLEET_DATA: FleetDriver[] = [
 export default function RidesPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<DashboardTab>('rides');
+  // const [activeTab, setActiveTab] = useState<DashboardTab>('rides');
   const [selectedDriver, setSelectedDriver] = useState<FleetDriver | null>(FLEET_DATA[0]);
 
   useEffect(() => {
@@ -137,7 +137,7 @@ export default function RidesPage() {
   return (
     <div className="min-h-screen bg-white text-slate-800 flex font-sans selection:bg-teal-100 selection:text-teal-900">
       {/* Reusable Sidebar */}
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+      {/* <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} /> */}
 
       {/* Main Container */}
       <main className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto">

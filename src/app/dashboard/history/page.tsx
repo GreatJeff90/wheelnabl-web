@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import Sidebar, { DashboardTab } from '@/components/dashboard/Sidebar';
+// import Sidebar, { DashboardTab } from '@/components/dashboard/Sidebar';
 import {
   Car,
   Clock,
@@ -126,7 +126,7 @@ const SAMPLE_TRANSACTIONS: TripTransaction[] = [
 export default function HistoryPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<DashboardTab>('history');
+  // const [activeTab, setActiveTab] = useState<DashboardTab>('history');
   const [selectedTx, setSelectedTx] = useState<TripTransaction | null>(SAMPLE_TRANSACTIONS[0]);
 
   useEffect(() => {
@@ -159,7 +159,7 @@ export default function HistoryPage() {
   return (
     <div className="min-h-screen bg-white text-slate-800 flex font-sans selection:bg-teal-100 selection:text-teal-900">
       {/* Sidebar */}
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+      {/* <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} /> */}
 
       {/* Main Container */}
       <main className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto">

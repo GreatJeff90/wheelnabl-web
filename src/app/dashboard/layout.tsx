@@ -14,12 +14,13 @@ export default function DashboardLayout({
 }) {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex font-sans selection:bg-teal-100 selection:text-teal-900">
-     
+      {/* 1. Full-height Sidebar on the left */}
+      <Sidebar />
 
-      {/* 2. Main View Pane with Global Top Header */}
+      {/* 2. Main View Pane with Top Header */}
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
         <DashboardHeader />
-        
+
         {/* Scrollable Child Pages */}
         <div className="flex-1 overflow-y-auto">
           {children}

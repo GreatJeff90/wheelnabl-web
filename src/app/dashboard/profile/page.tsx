@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import Sidebar, { DashboardTab } from '@/components/dashboard/Sidebar';
+// import Sidebar, { DashboardTab } from '@/components/dashboard/Sidebar';
 import {
   Edit3,
   Phone,
@@ -37,7 +37,7 @@ interface ProfileData {
 export default function ProfilePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<DashboardTab>('profile');
+  // const [activeTab, setActiveTab] = useState<DashboardTab>('profile');
 
   const [profile, setProfile] = useState<ProfileData>({
     id: '',
@@ -150,7 +150,7 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen bg-[#EDF0F8] text-slate-800 flex font-sans selection:bg-teal-100 selection:text-teal-900">
       {/* Sidebar */}
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+      {/* <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} /> */}
 
       {/* Main Container */}
       <main className="flex-1 p-6 md:p-8 pb-28 md:pb-8 max-w-7xl mx-auto space-y-6 overflow-y-auto">

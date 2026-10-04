@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import Sidebar, { DashboardTab } from '@/components/dashboard/Sidebar';
+// import Sidebar, { DashboardTab } from '@/components/dashboard/Sidebar';
 import {
   Wallet,
   MapPin,
@@ -73,7 +73,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<DashboardTab>('home');
+  // const [activeTab, setActiveTab] = useState<DashboardTab>('home');
 
   // Form State
   const [pickup, setPickup] = useState(ESTATE_LOCATIONS[0]);
@@ -194,7 +194,7 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex font-sans selection:bg-teal-100 selection:text-teal-900">
       {/* ── 1. Reusable Left Sidebar Component ────────────────────── */}
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+      {/* <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} /> */}
 
       {/* ── 2. Main Content Area ──────────────────────────────────── */}
       <main className="flex-1 p-6 sm:p-10 max-w-4xl mx-auto space-y-8 overflow-y-auto">
