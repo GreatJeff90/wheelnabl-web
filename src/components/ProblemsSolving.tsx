@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { motion, type Variants } from 'framer-motion';
 import { Zap, Footprints, ShieldCheck, Wallet } from 'lucide-react';
 
 interface ProblemCard {
@@ -43,14 +44,60 @@ const CARDS: ProblemCard[] = [
   },
 ];
 
+const containerVariants: Variants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.12,
+      delayChildren: 0.1,
+    },
+  },
+};
+
+const headerVariants: Variants = {
+  hidden: { opacity: 0, y: 24, filter: 'blur(4px)' },
+  visible: {
+    opacity: 1,
+    y: 0,
+    filter: 'blur(0px)',
+    transition: {
+      duration: 0.7,
+      ease: [0.16, 1, 0.3, 1],
+    },
+  },
+};
+
+const cardVariants: Variants = {
+  hidden: { opacity: 0, y: 35, scale: 0.96 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      type: 'spring',
+      damping: 24,
+      stiffness: 120,
+    },
+  },
+};
+
 export default function ProblemsSolving() {
   return (
-    <section id="services" className="py-16 px-4 sm:px-6 md:px-8 bg-white">
-      {/* ── Main Rounded Container Canvas ─────────────────────────── */}
-      <div className="max-w-7xl mx-auto rounded-[2.5rem] p-8 sm:p-12 md:p-16 ">
-        
+    <section id="services" className="py-16 px-4 sm:px-6 md:px-8 bg-white overflow-hidden">
+      {/* ── Main Container ────────────────────────────────────────── */}
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        whileInView="visible"
+        viewport={{ once: true, amount: 0.2 }}
+        className="max-w-7xl mx-auto rounded-[2.5rem] p-8 sm:p-12 md:p-16"
+      >
         {/* Top Header Row: Title & Subtitle Left, CTA Right */}
-        <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-12 sm:mb-16">
+        <motion.div
+          variants={headerVariants}
+          className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-12 sm:mb-16"
+        >
           <div className="max-w-2xl">
             <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-slate-900 tracking-tight">
               Why Wheelnabl?
@@ -61,14 +108,20 @@ export default function ProblemsSolving() {
           </div>
 
           <div className="shrink-0">
-            <Link
-              href="/signup"
-              className="inline-flex items-center justify-center bg-[#1B382B] hover:bg-[#12261D] text-white text-xs sm:text-sm font-semibold px-7 py-3 rounded-full transition shadow-sm active:scale-95"
+            <motion.div
+              whileHover={{ scale: 1.05, y: -2 }}
+              whileTap={{ scale: 0.95 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 17 }}
             >
-              Join Now
-            </Link>
+              <Link
+                href="/signup"
+                className="inline-flex items-center justify-center bg-[#1B382B] hover:bg-[#12261D] text-white text-xs sm:text-sm font-semibold px-7 py-3 rounded-full transition-colors shadow-sm cursor-pointer"
+              >
+                Join Now
+              </Link>
+            </motion.div>
           </div>
-        </div>
+        </motion.div>
 
         {/* 4 Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6">
@@ -76,14 +129,23 @@ export default function ProblemsSolving() {
             if (card.isFeatured) {
               return (
                 /* Primary Active / Dark Highlight Card */
-                <div
+                <motion.div
                   key={card.id}
-                  className="rounded-[2rem] bg-[#1B382B] text-white p-7 sm:p-8 flex flex-col justify-between shadow-lg shadow-emerald-950/15 min-h-[360px]"
+                  variants={cardVariants}
+                  whileHover={{ y: -8, transition: { duration: 0.25, ease: 'easeOut' } }}
+                  className="rounded-[2rem] bg-[#1B382B] text-white p-7 sm:p-8 flex flex-col justify-between shadow-xl shadow-emerald-950/20 min-h-[360px] relative overflow-hidden group"
                 >
-                  <div>
-                    <div className="mb-6 inline-block text-emerald-300">
+                  {/* Subtle Background Radial Glow */}
+                  <div className="absolute -top-24 -right-24 w-48 h-48 rounded-full bg-emerald-500/10 blur-2xl pointer-events-none group-hover:scale-125 transition-transform duration-500" />
+
+                  <div className="relative z-10">
+                    <motion.div
+                      animate={{ y: [0, -4, 0] }}
+                      transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut' }}
+                      className="mb-6 inline-block text-emerald-300"
+                    >
                       {card.icon}
-                    </div>
+                    </motion.div>
                     <h3 className="text-lg sm:text-xl font-bold tracking-tight mb-3">
                       {card.title}
                     </h3>
@@ -92,28 +154,36 @@ export default function ProblemsSolving() {
                     </p>
                   </div>
 
-                  <div className="pt-6">
-                    <Link
-                      href="/signup"
-                      className="inline-block w-full sm:w-auto text-center bg-white/10 hover:bg-white/20 text-white text-xs font-semibold px-6 py-2.5 rounded-full transition backdrop-blur-xs"
-                    >
-                      Join Now
-                    </Link>
+                  <div className="pt-6 relative z-10">
+                    <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
+                      <Link
+                        href="/signup"
+                        className="inline-block w-full sm:w-auto text-center bg-white/10 hover:bg-white/20 text-white text-xs font-semibold px-6 py-2.5 rounded-full transition-colors backdrop-blur-xs cursor-pointer border border-white/10"
+                      >
+                        Join Now
+                      </Link>
+                    </motion.div>
                   </div>
-                </div>
+                </motion.div>
               );
             }
 
             return (
               /* Light Companion Cards */
-              <div
+              <motion.div
                 key={card.id}
-                className="rounded-[2rem] bg-[#DDE9E2] text-slate-900 p-7 sm:p-8 flex flex-col justify-between min-h-[360px] border border-emerald-950/5 hover:border-emerald-900/20 transition-all duration-200"
+                variants={cardVariants}
+                whileHover={{ y: -8, transition: { duration: 0.25, ease: 'easeOut' } }}
+                className="rounded-[2rem] bg-[#DDE9E2] text-slate-900 p-7 sm:p-8 flex flex-col justify-between min-h-[360px] border border-emerald-950/5 hover:border-emerald-900/20 hover:shadow-lg hover:shadow-emerald-950/5 transition-colors duration-200 group"
               >
                 <div>
-                  <div className="mb-6 inline-block">
+                  <motion.div
+                    whileHover={{ scale: 1.15, rotate: 5 }}
+                    transition={{ type: 'spring', stiffness: 400, damping: 10 }}
+                    className="mb-6 inline-block"
+                  >
                     {card.icon}
-                  </div>
+                  </motion.div>
                   <h3 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900 mb-3">
                     {card.title}
                   </h3>
@@ -123,19 +193,20 @@ export default function ProblemsSolving() {
                 </div>
 
                 <div className="pt-6">
-                  <Link
-                    href="/signup"
-                    className="inline-block w-full sm:w-auto text-center bg-[#1B382B] hover:bg-[#12261D] text-white text-xs font-semibold px-6 py-2.5 rounded-full transition shadow-xs"
-                  >
-                    Join Now
-                  </Link>
+                  <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
+                    <Link
+                      href="/signup"
+                      className="inline-block w-full sm:w-auto text-center bg-[#1B382B] hover:bg-[#12261D] text-white text-xs font-semibold px-6 py-2.5 rounded-full transition-colors shadow-xs cursor-pointer"
+                    >
+                      Join Now
+                    </Link>
+                  </motion.div>
                 </div>
-              </div>
+              </motion.div>
             );
           })}
         </div>
-
-      </div>
+      </motion.div>
     </section>
   );
 }
