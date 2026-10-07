@@ -15,6 +15,8 @@ import {
   MessageCircle,
   Globe,
   Share2,
+  X,
+  Check,
 } from 'lucide-react';
 
 interface ProfileData {
@@ -42,6 +44,15 @@ export default function ProfilePage() {
     reg_date: 'Recently Registered',
     wallet_balance: 0,
   });
+
+  // Edit Profile Modal State
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editFullName, setEditFullName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editZone, setEditZone] = useState('');
+  const [editHouse, setEditHouse] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadProfile() {
@@ -74,18 +85,28 @@ export default function ProfilePage() {
           dbProfile?.full_name ||
           user.user_metadata?.full_name ||
           user.user_metadata?.name ||
-          (user.email ? user.email.split('@')[0] : 'greatjeff90');
+          (user.email ? user.email.split('@')[0] : 'Resident Member');
+
+        const resolvedPhone = dbProfile?.phone || user.user_metadata?.phone || '+234 810 000 0000';
+        const resolvedZone = dbProfile?.estate_zone || user.user_metadata?.estate_zone || 'Golf Estate, Phase 1';
+        const resolvedHouse = dbProfile?.house_number || user.user_metadata?.house_number || 'Plot 14, Road 3B';
 
         setProfile({
           id: user.id,
           email: user.email || '',
           full_name: resolvedName,
-          phone: dbProfile?.phone || user.user_metadata?.phone || '+234 810 000 0000',
-          estate_zone: dbProfile?.estate_zone || user.user_metadata?.estate_zone || 'Golf Estate, Phase 1',
-          house_number: dbProfile?.house_number || user.user_metadata?.house_number || 'Plot 14, Road 3B',
+          phone: resolvedPhone,
+          estate_zone: resolvedZone,
+          house_number: resolvedHouse,
           reg_date: formattedRegDate,
           wallet_balance: Number(dbProfile?.wallet_balance ?? 0),
         });
+
+        // Initialize edit states
+        setEditFullName(resolvedName);
+        setEditPhone(resolvedPhone);
+        setEditZone(resolvedZone);
+        setEditHouse(resolvedHouse);
       } catch (err) {
         console.error('Error fetching resident profile:', err);
       } finally {
@@ -95,6 +116,52 @@ export default function ProfilePage() {
 
     loadProfile();
   }, [router]);
+
+  const handleOpenEdit = () => {
+    setEditFullName(profile.full_name);
+    setEditPhone(profile.phone);
+    setEditZone(profile.estate_zone);
+    setEditHouse(profile.house_number);
+    setSaveError(null);
+    setIsEditOpen(true);
+  };
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!profile.id) return;
+
+    setIsSaving(true);
+    setSaveError(null);
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          full_name: editFullName.trim(),
+          phone: editPhone.trim(),
+          estate_zone: editZone.trim(),
+          house_number: editHouse.trim(),
+        })
+        .eq('id', profile.id);
+
+      if (error) throw error;
+
+      setProfile((prev) => ({
+        ...prev,
+        full_name: editFullName.trim(),
+        phone: editPhone.trim(),
+        estate_zone: editZone.trim(),
+        house_number: editHouse.trim(),
+      }));
+
+      setIsEditOpen(false);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to update profile';
+      setSaveError(msg);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -118,14 +185,9 @@ export default function ProfilePage() {
         
         {/* Top Header */}
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight">
-              Resident Profile
-            </h1>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Personal resident credentials and verified estate transit preferences
-            </p>
-          </div>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight">
+            Resident Profile
+          </h1>
           <div className="flex items-center gap-3">
             <span className="text-xs font-semibold px-3.5 py-1.5 bg-white border border-slate-200/80 rounded-full text-emerald-700 flex items-center gap-1.5 shadow-2xs">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
@@ -138,7 +200,7 @@ export default function ProfilePage() {
         <div className="bg-white rounded-[2rem] p-7 md:p-8 shadow-sm border border-slate-200/60 relative">
           <button
             type="button"
-            onClick={() => alert('Profile editing is synced with estate administration')}
+            onClick={handleOpenEdit}
             aria-label="Edit Profile"
             className="absolute top-7 right-7 w-9 h-9 rounded-full bg-slate-50 border border-slate-200/80 flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
           >
@@ -158,9 +220,6 @@ export default function ProfilePage() {
                 <h2 className="text-xl font-black text-slate-900 leading-tight">
                   {profile.full_name}
                 </h2>
-                <p className="text-xs text-slate-400 font-medium mt-0.5">
-                  Golf Estate Registered Fast-Pass Transit ID
-                </p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-2.5 gap-x-6 pt-2 text-xs text-slate-600">
@@ -222,7 +281,6 @@ export default function ProfilePage() {
           </div>
 
           <div className="relative pl-6 space-y-4 before:absolute before:left-2 before:top-4 before:bottom-4 before:w-0.5 before:bg-slate-200">
-            
             {/* Route 1 */}
             <div className="relative">
               <span className="absolute -left-6 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-3 border-white bg-[#004B4F] shadow-xs" />
@@ -294,11 +352,108 @@ export default function ProfilePage() {
                 </div>
               </div>
             </div>
-
           </div>
         </div>
 
       </main>
+
+      {/* ── Edit Profile Modal ────────────────────────── */}
+      {isEditOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-slate-100 space-y-6 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-900">Edit Profile Details</h3>
+              <button
+                type="button"
+                onClick={() => setIsEditOpen(false)}
+                className="p-1 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveProfile} className="space-y-4">
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
+                  Full Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editFullName}
+                  onChange={(e) => setEditFullName(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 text-slate-900 font-semibold text-xs rounded-xl px-3.5 py-2.5 outline-none focus:border-[#004B4F] focus:bg-white transition"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
+                  Phone Number
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editPhone}
+                  onChange={(e) => setEditPhone(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 text-slate-900 font-semibold text-xs rounded-xl px-3.5 py-2.5 outline-none focus:border-[#004B4F] focus:bg-white transition"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
+                  Estate Zone
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editZone}
+                  onChange={(e) => setEditZone(e.target.value)}
+                  placeholder="e.g. Golf Estate, Phase 1"
+                  className="w-full bg-slate-50 border border-slate-200 text-slate-900 font-semibold text-xs rounded-xl px-3.5 py-2.5 outline-none focus:border-[#004B4F] focus:bg-white transition"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
+                  House / Plot Address
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editHouse}
+                  onChange={(e) => setEditHouse(e.target.value)}
+                  placeholder="e.g. Plot 14, Road 3B"
+                  className="w-full bg-slate-50 border border-slate-200 text-slate-900 font-semibold text-xs rounded-xl px-3.5 py-2.5 outline-none focus:border-[#004B4F] focus:bg-white transition"
+                />
+              </div>
+
+              {saveError && (
+                <p className="text-xs text-rose-600 font-medium">{saveError}</p>
+              )}
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  className="w-full bg-[#004B4F] hover:bg-[#00383b] text-white text-xs font-bold py-3.5 rounded-full transition shadow-md shadow-teal-950/10 active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Saving Changes...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" />
+                      <span>Save Profile Changes</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

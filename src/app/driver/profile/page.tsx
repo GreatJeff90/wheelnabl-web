@@ -15,11 +15,12 @@ import {
   MessageCircle,
   Globe,
   Share2,
-  Zap,
-  Car,
   BatteryCharging,
+  Car,
   Award,
   Radio,
+  X,
+  Check,
 } from 'lucide-react';
 
 interface DriverProfileData {
@@ -54,6 +55,15 @@ export default function DriverProfilePage() {
     driver_rating: '4.95 ★',
   });
 
+  // Edit Modal State
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editFullName, setEditFullName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editCabId, setEditCabId] = useState('');
+  const [editSector, setEditSector] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
   useEffect(() => {
     async function loadDriverProfile() {
       try {
@@ -77,7 +87,7 @@ export default function DriverProfilePage() {
 
         const { data: dbProfile } = await supabase
           .from('profiles')
-          .select('id, email, full_name, phone')
+          .select('id, email, full_name, phone, badge_number, estate_zone')
           .eq('id', user.id)
           .maybeSingle();
 
@@ -87,19 +97,29 @@ export default function DriverProfilePage() {
           user.user_metadata?.name ||
           (user.email ? user.email.split('@')[0] : 'Fleet Patrol Driver');
 
+        const resolvedPhone = dbProfile?.phone || user.user_metadata?.phone || '+234 810 000 0000';
+        const resolvedBadge = dbProfile?.badge_number || user.user_metadata?.badge_number || 'WNB-DRV-084';
+        const resolvedSector = dbProfile?.estate_zone || 'Golf Estate Phase 1 & Clubhouse';
+        const resolvedCabId = user.user_metadata?.cab_id || 'EV Cab #04';
+
         setProfile({
           id: user.id,
           email: user.email || '',
           full_name: resolvedName,
-          phone: dbProfile?.phone || user.user_metadata?.phone || '+234 810 000 0000',
-          cab_id: 'EV Cab #04',
-          estate_sector: 'Golf Estate Phase 1 & Clubhouse',
-          badge_number: 'WNB-DRV-084',
+          phone: resolvedPhone,
+          cab_id: resolvedCabId,
+          estate_sector: resolvedSector,
+          badge_number: resolvedBadge,
           battery_level: 82,
           reg_date: formattedRegDate,
           total_completed_trips: 148,
           driver_rating: '4.95 ★',
         });
+
+        setEditFullName(resolvedName);
+        setEditPhone(resolvedPhone);
+        setEditCabId(resolvedCabId);
+        setEditSector(resolvedSector);
       } catch (err) {
         console.error('Error fetching driver profile:', err);
       } finally {
@@ -109,6 +129,51 @@ export default function DriverProfilePage() {
 
     loadDriverProfile();
   }, [router]);
+
+  const handleOpenEdit = () => {
+    setEditFullName(profile.full_name);
+    setEditPhone(profile.phone);
+    setEditCabId(profile.cab_id);
+    setEditSector(profile.estate_sector);
+    setSaveError(null);
+    setIsEditOpen(true);
+  };
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!profile.id) return;
+
+    setIsSaving(true);
+    setSaveError(null);
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          full_name: editFullName.trim(),
+          phone: editPhone.trim(),
+          estate_zone: editSector.trim(),
+        })
+        .eq('id', profile.id);
+
+      if (error) throw error;
+
+      setProfile((prev) => ({
+        ...prev,
+        full_name: editFullName.trim(),
+        phone: editPhone.trim(),
+        cab_id: editCabId.trim(),
+        estate_sector: editSector.trim(),
+      }));
+
+      setIsEditOpen(false);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to update driver details';
+      setSaveError(msg);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -132,18 +197,13 @@ export default function DriverProfilePage() {
         
         {/* Top Header */}
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight">
-              Driver Dossier & Vehicle Profile
-            </h1>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Verified security credentials, EV vehicle transponder, and estate clearance records
-            </p>
-          </div>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight">
+            Driver Profile
+          </h1>
           <div className="flex items-center gap-3">
             <span className="text-xs font-semibold px-3.5 py-1.5 bg-white border border-slate-200/80 rounded-full text-emerald-700 flex items-center gap-1.5 shadow-2xs">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-              Gatehouse Cleared • Operator #084
+              Gatehouse Cleared • Operator #{profile.badge_number.replace(/\D/g, '') || '084'}
             </span>
           </div>
         </div>
@@ -152,7 +212,7 @@ export default function DriverProfilePage() {
         <div className="bg-white rounded-[2rem] p-7 md:p-8 shadow-sm border border-slate-200/60 relative">
           <button
             type="button"
-            onClick={() => alert('Driver dossier updates are managed directly with Estate Security Control.')}
+            onClick={handleOpenEdit}
             aria-label="Edit Driver Profile"
             className="absolute top-7 right-7 w-9 h-9 rounded-full bg-slate-50 border border-slate-200/80 flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
           >
@@ -177,9 +237,6 @@ export default function DriverProfilePage() {
                     {profile.cab_id}
                   </span>
                 </div>
-                <p className="text-xs text-slate-400 font-medium mt-0.5">
-                  Golf Estate Verified Zero-Emission Transit Operator • Badge: {profile.badge_number}
-                </p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-2.5 gap-x-6 pt-2 text-xs text-slate-600">
@@ -280,7 +337,6 @@ export default function DriverProfilePage() {
           </div>
 
           <div className="relative pl-6 space-y-4 before:absolute before:left-2 before:top-4 before:bottom-4 before:w-0.5 before:bg-slate-200">
-            
             {/* Sector Route 1 */}
             <div className="relative">
               <span className="absolute -left-6 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-3 border-white bg-[#004B4F] shadow-xs" />
@@ -352,11 +408,108 @@ export default function DriverProfilePage() {
                 </div>
               </div>
             </div>
-
           </div>
         </div>
 
       </main>
+
+      {/* ── Edit Driver Details Modal ────────────────── */}
+      {isEditOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-slate-100 space-y-6 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-900">Edit Driver Details</h3>
+              <button
+                type="button"
+                onClick={() => setIsEditOpen(false)}
+                className="p-1 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveProfile} className="space-y-4">
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
+                  Driver Full Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editFullName}
+                  onChange={(e) => setEditFullName(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 text-slate-900 font-semibold text-xs rounded-xl px-3.5 py-2.5 outline-none focus:border-[#004B4F] focus:bg-white transition"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
+                  Dispatch Line / Phone
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editPhone}
+                  onChange={(e) => setEditPhone(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 text-slate-900 font-semibold text-xs rounded-xl px-3.5 py-2.5 outline-none focus:border-[#004B4F] focus:bg-white transition"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
+                  Assigned EV Cab Unit
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editCabId}
+                  onChange={(e) => setEditCabId(e.target.value)}
+                  placeholder="e.g. EV Cab #04"
+                  className="w-full bg-slate-50 border border-slate-200 text-slate-900 font-semibold text-xs rounded-xl px-3.5 py-2.5 outline-none focus:border-[#004B4F] focus:bg-white transition"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
+                  Patrol Sector / Zone
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editSector}
+                  onChange={(e) => setEditSector(e.target.value)}
+                  placeholder="e.g. Phase 1 & Clubhouse Sector"
+                  className="w-full bg-slate-50 border border-slate-200 text-slate-900 font-semibold text-xs rounded-xl px-3.5 py-2.5 outline-none focus:border-[#004B4F] focus:bg-white transition"
+                />
+              </div>
+
+              {saveError && (
+                <p className="text-xs text-rose-600 font-medium">{saveError}</p>
+              )}
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  className="w-full bg-[#004B4F] hover:bg-[#00383b] text-white text-xs font-bold py-3.5 rounded-full transition shadow-md shadow-teal-950/10 active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Saving Changes...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" />
+                      <span>Save Driver Profile</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
