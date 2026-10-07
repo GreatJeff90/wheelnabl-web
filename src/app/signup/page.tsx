@@ -5,10 +5,14 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { Mail, Lock, User, Eye, EyeOff, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, Loader2, AlertCircle, CheckCircle2, Car, Home, BadgeCheck } from 'lucide-react';
+
+type UserRole = 'resident' | 'driver';
 
 export default function SignupPage() {
   const router = useRouter();
+  const [role, setRole] = useState<UserRole>('resident');
+  const [driverBadgeId, setDriverBadgeId] = useState('');
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -23,6 +27,14 @@ export default function SignupPage() {
     setSuccessMsg(null);
     setLoading(true);
 
+    const cleanBadgeId = driverBadgeId.trim().toUpperCase();
+
+    if (role === 'driver' && !cleanBadgeId) {
+      setErrorMsg('Please enter your admin-issued Driver ID.');
+      setLoading(false);
+      return;
+    }
+
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -30,16 +42,39 @@ export default function SignupPage() {
         options: {
           data: {
             full_name: fullName,
+            role: role,
+            badge_number: role === 'driver' ? cleanBadgeId : null,
           },
         },
       });
 
       if (error) throw error;
 
+      if (data.user) {
+        // Upsert record into profiles table with role and badge ID
+        await supabase.from('profiles').upsert({
+          id: data.user.id,
+          email: data.user.email,
+          full_name: fullName,
+          role: role,
+          badge_number: role === 'driver' ? cleanBadgeId : null,
+          wallet_balance: role === 'driver' ? 18500 : 3500,
+        });
+      }
+
       if (data.session) {
-        router.push('/dashboard');
+        // Dynamic route depending on role
+        if (role === 'driver') {
+          router.push('/driver');
+        } else {
+          router.push('/dashboard');
+        }
       } else {
-        setSuccessMsg('Account created successfully! Check your email to confirm your account.');
+        setSuccessMsg(
+          role === 'driver'
+            ? 'Driver account registered! Check your email to verify and access the dispatch cockpit.'
+            : 'Resident account created! Check your email to confirm your account.'
+        );
       }
     } catch (err: unknown) {
       if (err instanceof Error) {
@@ -61,9 +96,9 @@ export default function SignupPage() {
         <div className="absolute w-[620px] h-[620px] rounded-full border border-slate-100" />
       </div>
 
-      <div className="relative z-10 w-full max-w-[390px]">
+      <div className="relative z-10 w-full max-w-[400px]">
         
-        {/* Main Phone-style White Card */}
+        {/* Main Card */}
         <div className="bg-white rounded-[2.5rem] px-8 py-10 shadow-xl shadow-slate-200/60 border border-slate-100 flex flex-col items-center">
           
           {/* Logo */}
@@ -78,8 +113,52 @@ export default function SignupPage() {
             />
           </Link>
 
+          {/* Role Toggle Selector */}
+          <div className="w-full bg-slate-100 p-1 rounded-full flex items-center mb-6">
+            <button
+              type="button"
+              onClick={() => {
+                setRole('resident');
+                setErrorMsg(null);
+              }}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-full text-xs font-bold transition cursor-pointer ${
+                role === 'resident'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <Home className="w-3.5 h-3.5 text-[#004B4F]" />
+              <span>Resident</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setRole('driver');
+                setErrorMsg(null);
+              }}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-full text-xs font-bold transition cursor-pointer ${
+                role === 'driver'
+                  ? 'bg-[#004B4F] text-white shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <Car className="w-3.5 h-3.5" />
+              <span>Fleet Driver</span>
+            </button>
+          </div>
+
           {/* Heading */}
-          <h1 className="text-2xl font-bold text-slate-900 mb-8">Create Account</h1>
+          <div className="text-center mb-6">
+            <h1 className="text-2xl font-bold text-slate-900">
+              {role === 'driver' ? 'Driver Registration' : 'Create Account'}
+            </h1>
+            <p className="text-xs text-slate-400 mt-1">
+              {role === 'driver'
+                ? 'Register with your estate-issued driver badge code'
+                : 'Intra-estate transit made simple for residents'}
+            </p>
+          </div>
 
           {errorMsg && (
             <div className="w-full mb-5 p-3 rounded-2xl bg-rose-50 border border-rose-100 text-rose-700 text-xs font-medium flex items-center gap-2">
@@ -97,13 +176,28 @@ export default function SignupPage() {
 
           <form onSubmit={handleSignup} className="w-full space-y-4">
             
+            {/* Driver ID Input (Only shown when Fleet Driver is selected) */}
+            {role === 'driver' && (
+              <div className="flex items-center gap-3 bg-white border border-teal-800/30 rounded-full px-5 py-3.5 focus-within:border-teal-800 transition shadow-xs">
+                <BadgeCheck className="w-4 h-4 text-[#004B4F] shrink-0" />
+                <input
+                  type="text"
+                  required
+                  placeholder="Driver ID (e.g. WNB-DRV-084)"
+                  value={driverBadgeId}
+                  onChange={(e) => setDriverBadgeId(e.target.value)}
+                  className="w-full bg-transparent text-sm text-slate-800 placeholder:text-slate-400 outline-none uppercase font-semibold"
+                />
+              </div>
+            )}
+
             {/* Full Name Input */}
             <div className="flex items-center gap-3 bg-white border border-slate-200 rounded-full px-5 py-3.5 focus-within:border-teal-800 transition shadow-xs">
               <User className="w-4 h-4 text-slate-400 shrink-0" />
               <input
                 type="text"
                 required
-                placeholder="Full Name"
+                placeholder={role === 'driver' ? 'Driver Full Name' : 'Full Name'}
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 className="w-full bg-transparent text-sm text-slate-800 placeholder:text-slate-400 outline-none"
@@ -116,7 +210,7 @@ export default function SignupPage() {
               <input
                 type="email"
                 required
-                placeholder="Email"
+                placeholder={role === 'driver' ? 'Driver Email' : 'Email'}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full bg-transparent text-sm text-slate-800 placeholder:text-slate-400 outline-none"
@@ -137,7 +231,7 @@ export default function SignupPage() {
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="text-slate-400 hover:text-slate-600 focus:outline-none"
+                className="text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer"
                 tabIndex={-1}
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -148,10 +242,16 @@ export default function SignupPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full mt-4 bg-[#0c3127] hover:bg-[#07241c] text-white text-sm font-semibold py-3.5 rounded-full transition shadow-md active:scale-[0.98] disabled:opacity-75 disabled:cursor-not-allowed flex items-center justify-center cursor-pointer"
+              className={`w-full mt-4 text-white text-sm font-semibold py-3.5 rounded-full transition shadow-md active:scale-[0.98] disabled:opacity-75 disabled:cursor-not-allowed flex items-center justify-center cursor-pointer ${
+                role === 'driver'
+                  ? 'bg-[#004B4F] hover:bg-[#00383b]'
+                  : 'bg-[#0c3127] hover:bg-[#07241c]'
+              }`}
             >
               {loading ? (
                 <Loader2 className="w-5 h-5 animate-spin text-white" />
+              ) : role === 'driver' ? (
+                'Register as Driver'
               ) : (
                 'Sign Up'
               )}
@@ -168,7 +268,7 @@ export default function SignupPage() {
             <button
               type="button"
               onClick={() => alert('Social registration coming soon')}
-              className="w-full flex items-center justify-center gap-2.5 py-3 rounded-full border border-slate-200/80 bg-slate-50/70 text-slate-700 text-xs font-semibold hover:bg-slate-100 transition"
+              className="w-full flex items-center justify-center gap-2.5 py-3 rounded-full border border-slate-200/80 bg-slate-50/70 text-slate-700 text-xs font-semibold hover:bg-slate-100 transition cursor-pointer"
             >
               <span className="font-bold text-slate-900">G</span>
               <span>Continue with Google</span>
