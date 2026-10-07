@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 import {
   Wallet,
   MapPin,
@@ -27,6 +28,14 @@ interface Profile {
   email: string;
   full_name: string | null;
   wallet_balance: number;
+}
+
+interface AssignedDriverInfo {
+  name: string;
+  phone: string;
+  cabNumber: string;
+  securityPin: string;
+  eta: string;
 }
 
 const ESTATE_LOCATIONS = [
@@ -81,10 +90,13 @@ export default function DashboardPage() {
   const [dropoff, setDropoff] = useState(ESTATE_LOCATIONS[3]);
   const [serviceType, setServiceType] = useState<'shuttle' | 'private'>('shuttle');
 
-  // Active Dispatch & Ride Payment Modal State
+  // Active Dispatch & Realtime Ride Tracking State
   const [activeModalOpen, setActiveModalOpen] = useState(false);
   const [modalStage, setModalStage] = useState<ModalStage>('confirming');
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [activeRideId, setActiveRideId] = useState<string | null>(null);
+  const [assignedDriver, setAssignedDriver] = useState<AssignedDriverInfo | null>(null);
+  const rideChannelRef = useRef<RealtimeChannel | null>(null);
 
   // Add Funds Modal State (Bachs Integration)
   const [isAddFundsOpen, setIsAddFundsOpen] = useState(false);
@@ -96,6 +108,15 @@ export default function DashboardPage() {
   const numericFare = serviceType === 'shuttle' ? 500 : 2500;
   const tripFareFormatted = serviceType === 'shuttle' ? '₦500' : '₦2,500';
   const hasSufficientBalance = (profile?.wallet_balance ?? 0) >= numericFare;
+
+  // Cleanup Supabase Realtime channel subscription on unmount
+  useEffect(() => {
+    return () => {
+      if (rideChannelRef.current) {
+        supabase.removeChannel(rideChannelRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     async function loadUserData() {
@@ -151,7 +172,6 @@ export default function DashboardPage() {
       const newBalance = currentBalance + addedVal;
 
       async function creditWallet() {
-        // Persist to Supabase
         await supabase
           .from('profiles')
           .update({ wallet_balance: newBalance })
@@ -161,7 +181,6 @@ export default function DashboardPage() {
           prev ? { ...prev, wallet_balance: newBalance } : null
         );
 
-        // Clean query parameters from URL
         window.history.replaceState({}, '', '/dashboard');
         alert(`Successfully funded wallet with ₦${addedVal.toLocaleString()} via Bachs!`);
       }
@@ -169,7 +188,7 @@ export default function DashboardPage() {
       creditWallet();
     }
   }, [profile]);
-  
+
   // Step 1: Open Confirmation & Ride Payment Drawer
   const handleOpenBookingSummary = () => {
     if (pickup === dropoff) {
@@ -180,46 +199,130 @@ export default function DashboardPage() {
     setActiveModalOpen(true);
   };
 
-  // Step 2: Confirm, Deduct Wallet Balance & Dispatch Driver
+  // Step 2: Confirm, Deduct Wallet Balance, Insert to 'rides' table & Listen for Driver Response
   const handleConfirmAndPay = async () => {
     if (!hasSufficientBalance) {
       alert('Insufficient wallet balance. Please add funds to proceed.');
       return;
     }
 
+    if (!profile) return;
+
     setIsProcessingPayment(true);
 
     try {
-      const updatedBalance = (profile?.wallet_balance ?? 0) - numericFare;
+      const updatedBalance = (profile.wallet_balance ?? 0) - numericFare;
 
-      if (profile?.id) {
-        await supabase
-          .from('profiles')
-          .update({ wallet_balance: updatedBalance })
-          .eq('id', profile.id);
+      // 1. Debit Resident Wallet Balance
+      await supabase
+        .from('profiles')
+        .update({ wallet_balance: updatedBalance })
+        .eq('id', profile.id);
+
+      setProfile((prev) => (prev ? { ...prev, wallet_balance: updatedBalance } : null));
+
+      // 2. Insert into the 'rides' table with status 'pending'
+      const { data: newRide, error: rideError } = await supabase
+        .from('rides')
+        .insert({
+          passenger_id: profile.id,
+          passenger_name: profile.full_name || 'Resident',
+          pickup,
+          dropoff,
+          fare: numericFare,
+          service_type: serviceType,
+          status: 'pending',
+        })
+        .select()
+        .single();
+
+      if (rideError || !newRide) {
+        throw new Error(rideError?.message || 'Failed to dispatch ride to estate fleet.');
       }
 
-      setProfile((prev) =>
-        prev ? { ...prev, wallet_balance: updatedBalance } : null
-      );
-
+      setActiveRideId(newRide.id);
       setModalStage('searching');
-
-      setTimeout(() => {
-        setModalStage('assigned');
-        setIsProcessingPayment(false);
-      }, 3000);
-    } catch (error) {
-      console.error('Payment failure:', error);
       setIsProcessingPayment(false);
-      alert('Could not complete ride payment. Please try again.');
+
+      // 3. Remove existing channel if any
+      if (rideChannelRef.current) {
+        supabase.removeChannel(rideChannelRef.current);
+      }
+
+      // 4. Subscribe to Supabase Realtime channel for driver response
+      const channel = supabase
+        .channel(`ride_status_${newRide.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'rides',
+            filter: `id=eq.${newRide.id}`,
+          },
+          (payload) => {
+            const updated = payload.new as {
+              status: string;
+              driver_name: string | null;
+              cab_number: string | null;
+              security_pin: string | null;
+            };
+
+            if (updated.status === 'accepted') {
+              setAssignedDriver({
+                name: updated.driver_name || 'Assigned Driver',
+                phone: '+2348000000000',
+                cabNumber: updated.cab_number || 'EV Cab #04',
+                securityPin: updated.security_pin || '4821',
+                eta: '3 Mins',
+              });
+              setModalStage('assigned');
+            } else if (updated.status === 'canceled') {
+              alert('Ride was canceled or declined by the driver.');
+              handleCancelTrip();
+            }
+          }
+        )
+        .subscribe();
+
+      rideChannelRef.current = channel;
+    } catch (error) {
+      console.error('Payment/Dispatch failure:', error);
+      setIsProcessingPayment(false);
+      alert('Could not complete ride booking. Please try again.');
     }
   };
 
-  const handleCancelTrip = () => {
+  const handleCancelTrip = async () => {
+    if (activeRideId && modalStage === 'searching') {
+      // Mark ride as canceled in Supabase
+      await supabase
+        .from('rides')
+        .update({ status: 'canceled' })
+        .eq('id', activeRideId);
+
+      // Refund the numeric fare if still searching
+      if (profile?.id) {
+        const refunded = (profile.wallet_balance ?? 0) + numericFare;
+        await supabase
+          .from('profiles')
+          .update({ wallet_balance: refunded })
+          .eq('id', profile.id);
+
+        setProfile((prev) => (prev ? { ...prev, wallet_balance: refunded } : null));
+      }
+    }
+
+    if (rideChannelRef.current) {
+      supabase.removeChannel(rideChannelRef.current);
+      rideChannelRef.current = null;
+    }
+
+    setActiveRideId(null);
     setActiveModalOpen(false);
     setModalStage('confirming');
     setIsProcessingPayment(false);
+    setAssignedDriver(null);
   };
 
   // Step 3: Trigger Bachs Gateway for Wallet Funding
@@ -289,7 +392,7 @@ export default function DashboardPage() {
               ₦{(profile?.wallet_balance ?? 0).toLocaleString('en-NG', { minimumFractionDigits: 2 })}
             </h2>
             <p className="text-[11px] text-slate-500 mt-1">
-              Auto-deducted for internal Gulf Estate trips
+              Auto-deducted for internal Golf Estate trips
             </p>
           </div>
 
@@ -553,7 +656,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* ── 3. Unified Ride Confirmation & Dispatch Modal ─────────── */}
+      {/* ── 3. Unified Ride Confirmation & Real-time Dispatch Modal ─── */}
       {activeModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-slate-100 space-y-6">
@@ -564,8 +667,8 @@ export default function DashboardPage() {
                 <span className={`w-2.5 h-2.5 rounded-full ${modalStage === 'confirming' ? 'bg-amber-500' : 'bg-emerald-500 animate-pulse'}`} />
                 <h3 className="text-sm font-bold text-slate-900">
                   {modalStage === 'confirming' && 'Confirm Ride & Pay'}
-                  {modalStage === 'searching' && 'Locating Golf Estate EV...'}
-                  {modalStage === 'assigned' && 'Cab En Route • Paid'}
+                  {modalStage === 'searching' && 'Broadcasting to Estate Drivers...'}
+                  {modalStage === 'assigned' && 'Driver Assigned • On Route'}
                 </h3>
               </div>
               <button
@@ -650,7 +753,7 @@ export default function DashboardPage() {
                     {isProcessingPayment ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Debiting Wallet & Booking...</span>
+                        <span>Debiting Wallet & Notifying Fleet...</span>
                       </>
                     ) : (
                       <>
@@ -663,7 +766,7 @@ export default function DashboardPage() {
               </div>
             )}
 
-            {/* STAGE 2: Searching for Fleet EV */}
+            {/* STAGE 2: Searching for Fleet EV via Realtime Channel */}
             {modalStage === 'searching' && (
               <div className="py-8 text-center space-y-4">
                 <div className="relative w-16 h-16 mx-auto flex items-center justify-center">
@@ -674,31 +777,31 @@ export default function DashboardPage() {
                 </div>
                 <div>
                   <p className="text-sm font-bold text-slate-800">
-                    Payment confirmed. Dispatching EV...
+                    Payment confirmed. Waiting for driver response...
                   </p>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Connecting to nearest patrol vehicle at {pickup}...
+                  <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
+                    Dispatched to active patrol drivers in Golf Estate. Your screen will update the moment a driver accepts.
                   </p>
                 </div>
               </div>
             )}
 
-            {/* STAGE 3: Matched, Paid & Call Driver */}
-            {modalStage === 'assigned' && (
+            {/* STAGE 3: Matched & Driver Responded in Realtime */}
+            {modalStage === 'assigned' && assignedDriver && (
               <div className="space-y-5">
                 <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-100">
                   <div className="flex items-center gap-3">
                     <div className="w-11 h-11 rounded-full bg-[#004B4F] text-white flex items-center justify-center font-bold text-sm shadow-sm">
-                      EK
+                      {assignedDriver.name.charAt(0)}
                     </div>
                     <div>
-                      <h4 className="text-sm font-bold text-slate-900">Emeka K.</h4>
-                      <p className="text-xs text-slate-500">Cab #03 • Zero-Emission EV</p>
+                      <h4 className="text-sm font-bold text-slate-900">{assignedDriver.name}</h4>
+                      <p className="text-xs text-slate-500">{assignedDriver.cabNumber} • Zero-Emission EV</p>
                     </div>
                   </div>
 
                   <a
-                    href="tel:+2348000000000"
+                    href={`tel:${assignedDriver.phone}`}
                     className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-xs"
                   >
                     <Phone className="w-3.5 h-3.5" />
@@ -711,14 +814,14 @@ export default function DashboardPage() {
                     <span className="text-[10px] font-bold text-teal-800 uppercase tracking-wider block">
                       ETA
                     </span>
-                    <span className="text-lg font-black text-[#004B4F]">3 Mins</span>
+                    <span className="text-lg font-black text-[#004B4F]">{assignedDriver.eta}</span>
                   </div>
                   <div className="p-3.5 rounded-2xl bg-orange-50 border border-orange-100 text-center">
                     <span className="text-[10px] font-bold text-[#FF7A00] uppercase tracking-wider block">
                       Security PIN
                     </span>
                     <span className="text-lg font-black text-slate-900 tracking-widest font-mono">
-                      4821
+                      {assignedDriver.securityPin}
                     </span>
                   </div>
                 </div>
@@ -745,7 +848,7 @@ export default function DashboardPage() {
               onClick={handleCancelTrip}
               className="w-full text-center text-xs font-semibold text-slate-400 hover:text-rose-500 py-1 transition cursor-pointer"
             >
-              {modalStage === 'assigned' ? 'End / Dismiss Ride View' : 'Cancel Request'}
+              {modalStage === 'assigned' ? 'Dismiss / Close View' : 'Cancel Request'}
             </button>
           </div>
         </div>

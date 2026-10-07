@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 import {
   Wallet,
   MapPin,
@@ -11,18 +12,13 @@ import {
   Loader2,
   ArrowDownLeft,
   ArrowUpRight,
-  Zap,
   Phone,
-  ShieldCheck,
   X,
-  CreditCard,
-  CheckCircle2,
-  AlertCircle,
-  Building2,
   Check,
   Power,
-  User,
   Car,
+  AlertCircle,
+  Building2,
 } from 'lucide-react';
 
 interface DriverProfile {
@@ -93,19 +89,9 @@ export default function DriverDashboardPage() {
   const [isOnline, setIsOnline] = useState(true);
 
   // Active Dispatch State
-  const [activeTrip, setActiveTrip] = useState<ActiveTripRequest | null>({
-    id: 'REQ-884',
-    passengerName: 'Olamide Praise',
-    passengerPhone: '+234 810 555 0192',
-    pickup: 'Phase 2 Gatehouse',
-    dropoff: 'Golf Estate Clubhouse',
-    fare: 2500,
-    serviceType: 'Private EV',
-    distance: '1.2 km',
-    status: 'incoming',
-  });
-
+  const [activeTrip, setActiveTrip] = useState<ActiveTripRequest | null>(null);
   const [recentTrips, setRecentTrips] = useState(INITIAL_RECENT_RIDES);
+  const channelRef = useRef<RealtimeChannel | null>(null);
 
   // Withdraw Modal State
   const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
@@ -162,50 +148,172 @@ export default function DriverDashboardPage() {
     loadDriverData();
   }, [router]);
 
-  // Trip Workflow Handlers
-  const handleAcceptTrip = () => {
-    if (!activeTrip) return;
-    setActiveTrip({ ...activeTrip, status: 'accepted' });
+  // Real-Time Dispatch Listener
+  useEffect(() => {
+    if (!isOnline) {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+      return;
+    }
+
+    // 1. Check for any current pending rides
+    async function fetchPendingRide() {
+      const { data: pendingRides } = await supabase
+        .from('rides')
+        .select('*')
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (pendingRides && pendingRides.length > 0) {
+        const item = pendingRides[0];
+        setActiveTrip({
+          id: item.id,
+          passengerName: item.passenger_name || 'Estate Resident',
+          passengerPhone: '+234 800 000 0000',
+          pickup: item.pickup,
+          dropoff: item.dropoff,
+          fare: Number(item.fare),
+          serviceType: item.service_type === 'private' ? 'Private EV' : 'Shuttle',
+          distance: '1.2 km',
+          status: 'incoming',
+        });
+      }
+    }
+
+    fetchPendingRide();
+
+    // 2. Subscribe to new ride bookings
+    const channel = supabase
+      .channel('driver_dispatch_radar')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'rides',
+        },
+        (payload) => {
+          const newOrder = payload.new as {
+            id: string;
+            passenger_name: string;
+            pickup: string;
+            dropoff: string;
+            fare: number;
+            service_type: string;
+            status: string;
+          };
+
+          if (newOrder.status === 'pending') {
+            setActiveTrip({
+              id: newOrder.id,
+              passengerName: newOrder.passenger_name || 'Estate Resident',
+              passengerPhone: '+234 800 000 0000',
+              pickup: newOrder.pickup,
+              dropoff: newOrder.dropoff,
+              fare: Number(newOrder.fare),
+              serviceType: newOrder.service_type === 'private' ? 'Private EV' : 'Shuttle',
+              distance: '1.2 km',
+              status: 'incoming',
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    channelRef.current = channel;
+
+    return () => {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+      }
+    };
+  }, [isOnline]);
+
+  // Accept Trip & Alert Resident
+  const handleAcceptTrip = async () => {
+    if (!activeTrip || !profile) return;
+
+    try {
+      const { error } = await supabase
+        .from('rides')
+        .update({
+          status: 'accepted',
+          driver_id: profile.id,
+          driver_name: profile.full_name || 'Fleet Driver 01',
+          cab_number: 'EV Cab #04',
+        })
+        .eq('id', activeTrip.id)
+        .eq('status', 'pending');
+
+      if (error) {
+        alert('This trip was already accepted by another driver or canceled.');
+        setActiveTrip(null);
+        return;
+      }
+
+      setActiveTrip({ ...activeTrip, status: 'accepted' });
+    } catch (err) {
+      console.error('Accept trip failure:', err);
+      alert('Could not accept trip. Please try again.');
+    }
   };
 
   const handleDeclineTrip = () => {
     setActiveTrip(null);
   };
 
+  // Progression: Arrived -> In Progress -> Completed
   const handleUpdateTripStage = async (nextStage: 'arrived' | 'in_progress' | 'completed') => {
     if (!activeTrip) return;
 
-    if (nextStage === 'completed') {
-      const earnedFare = activeTrip.fare;
-      const newBal = (profile?.wallet_balance ?? 0) + earnedFare;
+    try {
+      if (nextStage === 'completed') {
+        const earnedFare = activeTrip.fare;
+        const newBal = (profile?.wallet_balance ?? 0) + earnedFare;
 
-      // Persist to Supabase if authenticated
-      if (profile?.id) {
         await supabase
-          .from('profiles')
-          .update({ wallet_balance: newBal })
-          .eq('id', profile.id);
+          .from('rides')
+          .update({ status: 'completed' })
+          .eq('id', activeTrip.id);
+
+        if (profile?.id) {
+          await supabase
+            .from('profiles')
+            .update({ wallet_balance: newBal })
+            .eq('id', profile.id);
+        }
+
+        setProfile((prev) => (prev ? { ...prev, wallet_balance: newBal } : null));
+
+        setRecentTrips((prev) => [
+          {
+            id: activeTrip.id,
+            passenger: activeTrip.passengerName,
+            pickup: activeTrip.pickup,
+            dropoff: activeTrip.dropoff,
+            date: 'Just now',
+            payout: `₦${earnedFare.toLocaleString()}`,
+            type: activeTrip.serviceType,
+          },
+          ...prev,
+        ]);
+
+        setActiveTrip(null);
+        alert(`Trip completed! ₦${earnedFare.toLocaleString()} credited to your balance.`);
+      } else {
+        await supabase
+          .from('rides')
+          .update({ status: nextStage })
+          .eq('id', activeTrip.id);
+
+        setActiveTrip({ ...activeTrip, status: nextStage });
       }
-
-      setProfile((prev) => (prev ? { ...prev, wallet_balance: newBal } : null));
-
-      setRecentTrips((prev) => [
-        {
-          id: activeTrip.id,
-          passenger: activeTrip.passengerName,
-          pickup: activeTrip.pickup,
-          dropoff: activeTrip.dropoff,
-          date: 'Just now',
-          payout: `₦${earnedFare.toLocaleString()}`,
-          type: activeTrip.serviceType,
-        },
-        ...prev,
-      ]);
-
-      setActiveTrip(null);
-      alert(`Trip completed! ₦${earnedFare.toLocaleString()} credited to your balance.`);
-    } else {
-      setActiveTrip({ ...activeTrip, status: nextStage });
+    } catch (err) {
+      console.error('Update stage failure:', err);
+      alert('Could not update trip state. Check internet connectivity.');
     }
   };
 
@@ -311,7 +419,7 @@ export default function DriverDashboardPage() {
               ₦{(profile?.wallet_balance ?? 0).toLocaleString('en-NG', { minimumFractionDigits: 2 })}
             </h2>
             <div className="flex items-center gap-4 mt-2 text-xs text-slate-500">
-              <span>Today&apos;s Runs: <strong className="text-slate-800">4 Completed</strong></span>
+              <span>Today&apos;s Runs: <strong className="text-slate-800">{recentTrips.length} Completed</strong></span>
               <span>•</span>
               <span>Settlement: <strong className="text-emerald-700">Direct to Bank</strong></span>
             </div>
@@ -352,12 +460,13 @@ export default function DriverDashboardPage() {
               </div>
               <p className="text-sm font-bold text-slate-800">No Active Ride Requests</p>
               <p className="text-xs text-slate-400 max-w-xs mx-auto">
-                Keep your status set to &quot;Online&quot; to automatically receive nearby resident bookings across Golf Estate.
+                {isOnline
+                  ? 'Listening for incoming orders across Golf Estate. Nearby resident trips will appear here automatically.'
+                  : 'You are currently offline. Switch your status to online above to receive trip calls.'}
               </p>
             </div>
           ) : (
             <div className="space-y-6">
-              {/* Passenger & Fare Overview */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-200/70">
                 <div className="flex items-center gap-3">
                   <div className="w-11 h-11 rounded-full bg-[#004B4F] text-white flex items-center justify-center font-black text-sm">
@@ -365,7 +474,7 @@ export default function DriverDashboardPage() {
                   </div>
                   <div>
                     <h4 className="text-sm font-bold text-slate-900">{activeTrip.passengerName}</h4>
-                    <p className="text-xs text-slate-500">Verified Golf Estate Resident • {activeTrip.distance}</p>
+                    <p className="text-xs text-slate-500">Golf Estate Resident • {activeTrip.serviceType}</p>
                   </div>
                 </div>
 
@@ -383,7 +492,6 @@ export default function DriverDashboardPage() {
                 </div>
               </div>
 
-              {/* Waypoints */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                 <div className="p-3.5 rounded-2xl bg-teal-50/70 border border-teal-100">
                   <span className="text-[10px] font-bold text-teal-800 uppercase tracking-wider block mb-1">
@@ -406,7 +514,6 @@ export default function DriverDashboardPage() {
                 </div>
               </div>
 
-              {/* State Dependent Actions */}
               {activeTrip.status === 'incoming' && (
                 <div className="grid grid-cols-2 gap-3 pt-2">
                   <button
