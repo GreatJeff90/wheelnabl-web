@@ -136,13 +136,14 @@ export default function ProfilePage() {
     try {
       const { error } = await supabase
         .from('profiles')
-        .update({
+        .upsert({
+          id: profile.id,
+          email: profile.email,
           full_name: editFullName.trim(),
           phone: editPhone.trim(),
           estate_zone: editZone.trim(),
           house_number: editHouse.trim(),
-        })
-        .eq('id', profile.id);
+        });
 
       if (error) throw error;
 

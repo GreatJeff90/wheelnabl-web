@@ -149,12 +149,13 @@ export default function DriverProfilePage() {
     try {
       const { error } = await supabase
         .from('profiles')
-        .update({
+        .upsert({
+          id: profile.id,
+          email: profile.email,
           full_name: editFullName.trim(),
           phone: editPhone.trim(),
           estate_zone: editSector.trim(),
-        })
-        .eq('id', profile.id);
+        });
 
       if (error) throw error;
 
