@@ -39,14 +39,13 @@ interface AssignedDriverInfo {
 }
 
 const ESTATE_LOCATIONS = [
-  'Gulf Estate Main Gate',
+  'Golf Estate Main Gate',
   'Phase 1 Gatehouse',
   'Phase 2 Gatehouse',
   'Clubhouse & Recreation Center',
   'Sports Pavilion & Tennis Court',
-  'Road 1 Residential Zone',
-  'Road 4 Residential Zone',
-  'Peter Odili Exit Link',
+  'Town Houses',
+  'JDP Round about',
 ];
 
 const RECENT_TRIPS = [
