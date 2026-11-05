@@ -58,7 +58,7 @@ export default function SignupPage() {
           full_name: fullName,
           role: role,
           badge_number: role === 'driver' ? cleanBadgeId : null,
-          wallet_balance: role === 'driver' ? 18500 : 3500,
+          wallet_balance: role === 'driver' ? 35.0 : 7.0,
         });
       }
 

@@ -288,7 +288,7 @@ export default function ProfilePage() {
                 <div>
                   <h4 className="text-xs font-bold text-slate-900">Residence → Phase 1 Gatehouse</h4>
                   <p className="text-[11px] text-slate-500 mt-0.5">Morning commute link to express highway</p>
-                  <span className="text-[10px] font-bold text-[#004B4F] mt-1 inline-block">₦500 Flat Shuttle</span>
+                  <span className="text-[10px] font-bold text-[#004B4F] mt-1 inline-block">0.9 hp Flat Shuttle</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
@@ -312,7 +312,7 @@ export default function ProfilePage() {
                 <div>
                   <h4 className="text-xs font-bold text-slate-900">Residence → Golf Estate Clubhouse</h4>
                   <p className="text-[11px] text-slate-500 mt-0.5">Gym, swimming pool & tennis court access</p>
-                  <span className="text-[10px] font-bold text-slate-700 mt-1 inline-block">₦500 Flat Shuttle</span>
+                  <span className="text-[10px] font-bold text-slate-700 mt-1 inline-block">0.9 hp Flat Shuttle</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-slate-200 text-slate-700">
@@ -336,7 +336,7 @@ export default function ProfilePage() {
                 <div>
                   <h4 className="text-xs font-bold text-slate-900">Direct Gate-to-Gate Phase 2 Transfer</h4>
                   <p className="text-[11px] text-slate-500 mt-0.5">Fast private EV direct transit</p>
-                  <span className="text-[10px] font-bold text-[#FF7A00] mt-1 inline-block">₦2,500 Private EV</span>
+                  <span className="text-[10px] font-bold text-[#FF7A00] mt-1 inline-block">4.6 hp Private EV</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-orange-100 text-orange-800">

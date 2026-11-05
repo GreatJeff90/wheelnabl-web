@@ -344,7 +344,7 @@ export default function DriverProfilePage() {
                 <div>
                   <h4 className="text-xs font-bold text-slate-900">Phase 1 Gatehouse ⇄ Clubhouse & Sports Pavilion</h4>
                   <p className="text-[11px] text-slate-500 mt-0.5">Primary transit artery • Speed limit 25 km/h strictly enforced</p>
-                  <span className="text-[10px] font-bold text-[#004B4F] mt-1 inline-block">₦500 Flat Shuttle Payout</span>
+                  <span className="text-[10px] font-bold text-[#004B4F] mt-1 inline-block">0.9 hp Flat Shuttle Payout</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
@@ -368,7 +368,7 @@ export default function DriverProfilePage() {
                 <div>
                   <h4 className="text-xs font-bold text-slate-900">Road 4 Residential Zone ⇄ Main Gate Solar Bay</h4>
                   <p className="text-[11px] text-slate-500 mt-0.5">Door-to-door resident pickups & visitor parking transfer</p>
-                  <span className="text-[10px] font-bold text-slate-700 mt-1 inline-block">₦500 Flat Shuttle Payout</span>
+                  <span className="text-[10px] font-bold text-slate-700 mt-1 inline-block">0.9 hp Flat Shuttle Payout</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-slate-200 text-slate-700">
@@ -392,7 +392,7 @@ export default function DriverProfilePage() {
                 <div>
                   <h4 className="text-xs font-bold text-slate-900">Gate-to-Gate Phase 2 Direct Express EV</h4>
                   <p className="text-[11px] text-slate-500 mt-0.5">Direct express transit with VIP priority barrier pass</p>
-                  <span className="text-[10px] font-bold text-[#FF7A00] mt-1 inline-block">₦2,500 Private EV Payout</span>
+                  <span className="text-[10px] font-bold text-[#FF7A00] mt-1 inline-block">4.6 hp Private EV Payout</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-orange-100 text-orange-800">
