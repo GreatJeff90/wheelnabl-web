@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import type { RealtimeChannel } from '@supabase/supabase-js';
+import { useDriverPresence } from '@/hooks/useDriverPresence';
 import {
   Wallet,
   MapPin,
@@ -102,6 +103,17 @@ export default function DriverDashboardPage() {
   const [isProcessingWithdraw, setIsProcessingWithdraw] = useState(false);
   const [withdrawError, setWithdrawError] = useState<string | null>(null);
   const [withdrawSuccess, setWithdrawSuccess] = useState(false);
+
+  // Broadcast driver online presence in real-time
+  useDriverPresence('driver', {
+    driverId: profile?.id,
+    fullName: profile?.full_name || 'Fleet Driver',
+    isOnline,
+    badgeNumber: 'WNB-DRV-084',
+    sector: 'Golf Estate Phase 1 & Clubhouse',
+    cabNumber: 'EV Cab #04',
+    battery: 82,
+  });
 
   useEffect(() => {
     async function loadDriverData() {

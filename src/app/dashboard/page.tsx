@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import type { RealtimeChannel } from '@supabase/supabase-js';
+import { useDriverPresence } from '@/hooks/useDriverPresence';
 import {
   Wallet,
   MapPin,
@@ -99,6 +100,7 @@ export default function DashboardPage() {
 
   // Add Funds Modal State (Bachs Integration)
   const [isAddFundsOpen, setIsAddFundsOpen] = useState(false);
+  const { onlineDrivers } = useDriverPresence('resident');
   const [fundAmount, setFundAmount] = useState<number>(1000);
   const [customFundAmount, setCustomFundAmount] = useState<string>('');
   const [isProcessingFunding, setIsProcessingFunding] = useState(false);
@@ -413,9 +415,20 @@ export default function DashboardPage() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h3 className="text-lg font-bold text-slate-900">Book Estate Ride</h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Dispatch an intra-estate electric vehicle to your coordinates
-              </p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <p className="text-xs text-slate-500">
+                  Dispatch an intra-estate electric vehicle to your coordinates
+                </p>
+                {onlineDrivers.length > 0 && (
+                  <>
+                    <span className="text-slate-300">•</span>
+                    <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      {onlineDrivers.length} Online
+                    </span>
+                  </>
+                )}
+              </div>
             </div>
 
             {/* Ride Mode Selector */}
