@@ -361,7 +361,7 @@ export default function DashboardPage() {
             onClick={handleOpenBookingSummary}
             className="w-full h-16 bg-slate-900 hover:bg-black text-white rounded-2xl flex items-center justify-center gap-3 transition group active:scale-[0.99] shadow-xl shadow-slate-900/10"
           >
-            <span className="font-bold tracking-tight">Confirm & Dispatch Ride</span>
+            <span className="font-bold tracking-tight">Confirm Ride</span>
             <span className="h-6 w-px bg-white/20" />
             <span className="font-black text-teal-400">{tripFareFormatted}</span>
             <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
