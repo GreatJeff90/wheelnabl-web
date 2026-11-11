@@ -9,17 +9,21 @@ import {
   Wallet,
   MapPin,
   Navigation,
-  Clock,
   Loader2,
   ArrowDownLeft,
   ArrowUpRight,
   Phone,
   X,
-  Check,
   Power,
   Car,
   AlertCircle,
   Building2,
+  Zap,
+  Activity,
+  CheckCircle2,
+  Clock,
+  History,
+  ShieldCheck,
 } from 'lucide-react';
 
 interface DriverProfile {
@@ -42,45 +46,12 @@ interface ActiveTripRequest {
 }
 
 const NIGERIAN_BANKS = [
-  'Access Bank',
-  'GTBank (Guaranty Trust Bank)',
-  'Zenith Bank',
-  'First Bank of Nigeria',
-  'UBA (United Bank for Africa)',
-  'Kuda Bank',
-  'Opay',
-  'Moniepoint',
-  'Stanbic IBTC Bank',
+  'Access Bank', 'GTBank', 'Zenith Bank', 'First Bank', 'UBA', 'Kuda Bank', 'Opay', 'Moniepoint', 'Stanbic IBTC',
 ];
 
 const INITIAL_RECENT_RIDES = [
-  {
-    id: 'TRP-501',
-    passenger: 'Dr. Alabo Briggs',
-    pickup: 'Phase 1 Gatehouse',
-    dropoff: 'Clubhouse & Recreation Center',
-    date: 'Today, 3:15 PM',
-    payout: '₦500',
-    type: 'Shuttle',
-  },
-  {
-    id: 'TRP-500',
-    passenger: 'Grace Nwosu',
-    pickup: 'Road 4 Residential Zone',
-    dropoff: 'Gulf Estate Main Gate',
-    date: 'Today, 1:40 PM',
-    payout: '₦2,500',
-    type: 'Private EV',
-  },
-  {
-    id: 'TRP-499',
-    passenger: 'Pastor Tari',
-    pickup: 'Peter Odili Exit Link',
-    dropoff: 'Sports Pavilion & Tennis Court',
-    date: 'Today, 11:20 AM',
-    payout: '₦500',
-    type: 'Shuttle',
-  },
+  { id: 'TRP-501', passenger: 'Dr. Alabo Briggs', pickup: 'Phase 1 Gate', dropoff: 'Clubhouse', date: '3:15 PM', payout: '0.9 hp', type: 'Shuttle' },
+  { id: 'TRP-500', passenger: 'Grace Nwosu', pickup: 'Road 4 Residential', dropoff: 'Main Gate', date: '1:40 PM', payout: '4.7 hp', type: 'Private EV' },
 ];
 
 export default function DriverDashboardPage() {
@@ -94,7 +65,18 @@ export default function DriverDashboardPage() {
   const [recentTrips, setRecentTrips] = useState(INITIAL_RECENT_RIDES);
   const channelRef = useRef<RealtimeChannel | null>(null);
 
-  // Withdraw Modal State
+  // Presence
+  useDriverPresence('driver', {
+    driverId: profile?.id,
+    fullName: profile?.full_name || 'Fleet Driver',
+    isOnline,
+    badgeNumber: 'WNB-DRV-084',
+    sector: 'Sector 1 (Phase 1 & Clubhouse)',
+    cabNumber: 'EV Unit #04',
+    battery: 82,
+  });
+
+  // Withdraw State
   const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState<string>('');
   const [selectedBank, setSelectedBank] = useState(NIGERIAN_BANKS[0]);
@@ -118,650 +100,315 @@ export default function DriverDashboardPage() {
   useEffect(() => {
     async function loadDriverData() {
       try {
-        const {
-          data: { user },
-          error: authError,
-        } = await supabase.auth.getUser();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) { router.replace('/login'); return; }
 
-        if (authError || !user) {
-          router.replace('/login');
-          return;
-        }
-
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('id, email, full_name, wallet_balance')
-          .eq('id', user.id)
-          .maybeSingle();
-
+        const { data: profileData } = await supabase.from('profiles').select('id, email, full_name, wallet_balance').eq('id', user.id).maybeSingle();
         if (profileData) {
-          setProfile({
-            id: user.id,
-            email: user.email || '',
-            full_name: profileData.full_name || user.user_metadata?.full_name || 'Fleet Driver 01',
-            wallet_balance: Number(profileData.wallet_balance ?? 18500),
-          });
-          setAccountName(profileData.full_name || user.user_metadata?.full_name || 'Driver Account');
+          setProfile({ id: user.id, email: user.email || '', full_name: profileData.full_name || 'Fleet Driver', wallet_balance: Number(profileData.wallet_balance ?? 34.4) });
+          setAccountName(profileData.full_name || 'Driver Account');
         } else {
-          setProfile({
-            id: user.id,
-            email: user.email || '',
-            full_name: user.user_metadata?.full_name || 'Fleet Driver 01',
-            wallet_balance: 18500,
-          });
+          setProfile({ id: user.id, email: user.email || '', full_name: 'Fleet Driver', wallet_balance: 34.4 });
         }
-      } catch (err) {
-        console.error('Error loading driver profile:', err);
-      } finally {
-        setLoading(false);
-      }
+      } catch (err) { console.error(err); } finally { setLoading(false); }
     }
-
     loadDriverData();
   }, [router]);
 
-  // Real-Time Dispatch Listener
   useEffect(() => {
     if (!isOnline) {
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
-        channelRef.current = null;
-      }
+      if (channelRef.current) { supabase.removeChannel(channelRef.current); channelRef.current = null; }
       return;
     }
-
-    // 1. Check for any current pending rides
     async function fetchPendingRide() {
-      const { data: pendingRides } = await supabase
-        .from('rides')
-        .select('*')
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false })
-        .limit(1);
-
-      if (pendingRides && pendingRides.length > 0) {
-        const item = pendingRides[0];
+      const { data } = await supabase.from('rides').select('*').eq('status', 'pending').order('created_at', { ascending: false }).limit(1);
+      if (data && data.length > 0) {
+        const item = data[0];
         setActiveTrip({
-          id: item.id,
-          passengerName: item.passenger_name || 'Estate Resident',
-          passengerPhone: '+234 800 000 0000',
-          pickup: item.pickup,
-          dropoff: item.dropoff,
-          fare: Number(item.fare),
-          serviceType: item.service_type === 'private' ? 'Private EV' : 'Shuttle',
-          distance: '1.2 km',
-          status: 'incoming',
+          id: item.id, passengerName: item.passenger_name || 'Resident', passengerPhone: '+234 800 000 0000',
+          pickup: item.pickup, dropoff: item.dropoff, fare: Number(item.fare),
+          serviceType: item.service_type === 'private' ? 'Private EV' : 'Shuttle', distance: '1.2 km', status: 'incoming',
         });
       }
     }
-
     fetchPendingRide();
-
-    // 2. Subscribe to new ride bookings
-    const channel = supabase
-      .channel('driver_dispatch_radar')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'rides',
-        },
-        (payload) => {
-          const newOrder = payload.new as {
-            id: string;
-            passenger_name: string;
-            pickup: string;
-            dropoff: string;
-            fare: number;
-            service_type: string;
-            status: string;
-          };
-
-          if (newOrder.status === 'pending') {
-            setActiveTrip({
-              id: newOrder.id,
-              passengerName: newOrder.passenger_name || 'Estate Resident',
-              passengerPhone: '+234 800 000 0000',
-              pickup: newOrder.pickup,
-              dropoff: newOrder.dropoff,
-              fare: Number(newOrder.fare),
-              serviceType: newOrder.service_type === 'private' ? 'Private EV' : 'Shuttle',
-              distance: '1.2 km',
-              status: 'incoming',
-            });
-          }
-        }
-      )
-      .subscribe();
-
-    channelRef.current = channel;
-
-    return () => {
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
+    const channel = supabase.channel('driver_dispatch_radar').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'rides' }, (payload) => {
+      const newOrder = payload.new as any;
+      if (newOrder.status === 'pending') {
+        setActiveTrip({
+          id: newOrder.id, passengerName: newOrder.passenger_name || 'Resident', passengerPhone: '+234 800 000 0000',
+          pickup: newOrder.pickup, dropoff: newOrder.dropoff, fare: Number(newOrder.fare),
+          serviceType: newOrder.service_type === 'private' ? 'Private EV' : 'Shuttle', distance: '1.2 km', status: 'incoming',
+        });
       }
-    };
+    }).subscribe();
+    channelRef.current = channel;
+    return () => { if (channelRef.current) supabase.removeChannel(channelRef.current); };
   }, [isOnline]);
 
-  // Accept Trip & Alert Resident
   const handleAcceptTrip = async () => {
     if (!activeTrip || !profile) return;
-
     try {
-      const { error } = await supabase
-        .from('rides')
-        .update({
-          status: 'accepted',
-          driver_id: profile.id,
-          driver_name: profile.full_name || 'Fleet Driver 01',
-          cab_number: 'EV Cab #04',
-        })
-        .eq('id', activeTrip.id)
-        .eq('status', 'pending');
-
-      if (error) {
-        alert('This trip was already accepted by another driver or canceled.');
-        setActiveTrip(null);
-        return;
-      }
-
+      const { error } = await supabase.from('rides').update({ status: 'accepted', driver_id: profile.id, driver_name: profile.full_name, cab_number: 'EV Unit #04' }).eq('id', activeTrip.id).eq('status', 'pending');
+      if (error) { alert('Trip unavailable.'); setActiveTrip(null); return; }
       setActiveTrip({ ...activeTrip, status: 'accepted' });
-    } catch (err) {
-      console.error('Accept trip failure:', err);
-      alert('Could not accept trip. Please try again.');
-    }
+    } catch (err) { alert('Accept failed.'); }
   };
 
-  const handleDeclineTrip = () => {
-    setActiveTrip(null);
-  };
-
-  // Progression: Arrived -> In Progress -> Completed
   const handleUpdateTripStage = async (nextStage: 'arrived' | 'in_progress' | 'completed') => {
-    if (!activeTrip) return;
-
+    if (!activeTrip || !profile) return;
     try {
       if (nextStage === 'completed') {
         const earnedFare = activeTrip.fare;
-        const newBal = (profile?.wallet_balance ?? 0) + earnedFare;
-
-        await supabase
-          .from('rides')
-          .update({ status: 'completed' })
-          .eq('id', activeTrip.id);
-
-        if (profile?.id) {
-          await supabase
-            .from('profiles')
-            .update({ wallet_balance: newBal })
-            .eq('id', profile.id);
-        }
-
-        setProfile((prev) => (prev ? { ...prev, wallet_balance: newBal } : null));
-
-        setRecentTrips((prev) => [
-          {
-            id: activeTrip.id,
-            passenger: activeTrip.passengerName,
-            pickup: activeTrip.pickup,
-            dropoff: activeTrip.dropoff,
-            date: 'Just now',
-            payout: `₦${earnedFare.toLocaleString()}`,
-            type: activeTrip.serviceType,
-          },
-          ...prev,
-        ]);
-
+        const newBal = profile.wallet_balance + earnedFare;
+        await supabase.from('rides').update({ status: 'completed' }).eq('id', activeTrip.id);
+        await supabase.from('profiles').update({ wallet_balance: newBal }).eq('id', profile.id);
+        setProfile({ ...profile, wallet_balance: newBal });
+        setRecentTrips((prev) => [{ id: activeTrip.id, passenger: activeTrip.passengerName, pickup: activeTrip.pickup, dropoff: activeTrip.dropoff, date: 'Just now', payout: `${earnedFare.toFixed(1)} hp`, type: activeTrip.serviceType }, ...prev]);
         setActiveTrip(null);
-        alert(`Trip completed! ₦${earnedFare.toLocaleString()} credited to your balance.`);
       } else {
-        await supabase
-          .from('rides')
-          .update({ status: nextStage })
-          .eq('id', activeTrip.id);
-
+        await supabase.from('rides').update({ status: nextStage }).eq('id', activeTrip.id);
         setActiveTrip({ ...activeTrip, status: nextStage });
       }
-    } catch (err) {
-      console.error('Update stage failure:', err);
-      alert('Could not update trip state. Check internet connectivity.');
-    }
+    } catch (err) { alert('Update failed.'); }
   };
 
-  // Withdraw Handler
   const handleProcessWithdrawal = async () => {
     const amountNum = Number(withdrawAmount);
-    setWithdrawError(null);
-
-    const currentBal = profile?.wallet_balance ?? 0;
-
-    if (!amountNum || amountNum < 500) {
-      setWithdrawError('Minimum withdrawal amount is ₦500');
-      return;
-    }
-
-    if (amountNum > currentBal) {
-      setWithdrawError(`Insufficient earnings. Maximum withdrawable is ₦${currentBal.toLocaleString()}`);
-      return;
-    }
-
-    if (!accountNumber || accountNumber.length < 10) {
-      setWithdrawError('Please enter a valid 10-digit NUBAN account number');
-      return;
-    }
-
+    if (!amountNum || amountNum < 1.0) { setWithdrawError('Min withdrawal 1.0 hp'); return; }
+    if (amountNum > (profile?.wallet_balance ?? 0)) { setWithdrawError('Insufficient balance'); return; }
     setIsProcessingWithdraw(true);
-
     try {
-      const newBalance = currentBal - amountNum;
-
-      if (profile?.id) {
-        await supabase
-          .from('profiles')
-          .update({ wallet_balance: newBalance })
-          .eq('id', profile.id);
-      }
-
-      setProfile((prev) => (prev ? { ...prev, wallet_balance: newBalance } : null));
+      const newBal = (profile?.wallet_balance ?? 0) - amountNum;
+      await supabase.from('profiles').update({ wallet_balance: newBal }).eq('id', profile?.id);
+      setProfile((p) => p ? { ...p, wallet_balance: newBal } : null);
       setWithdrawSuccess(true);
-
-      setTimeout(() => {
-        setWithdrawSuccess(false);
-        setIsWithdrawOpen(false);
-        setWithdrawAmount('');
-        setAccountNumber('');
-        setIsProcessingWithdraw(false);
-      }, 2000);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Settlement payout failed';
-      setWithdrawError(msg);
-      setIsProcessingWithdraw(false);
-    }
+      setTimeout(() => { setWithdrawSuccess(false); setIsWithdrawOpen(false); setWithdrawAmount(''); setIsProcessingWithdraw(false); }, 2000);
+    } catch (err: any) { setWithdrawError(err.message); setIsProcessingWithdraw(false); }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-[#004B4F]" />
-      </div>
-    );
-  }
+  if (loading) return <div className="flex h-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-teal-600" /></div>;
 
   return (
-    <div className="min-h-screen bg-[#EDF0F8] text-slate-900 flex font-sans selection:bg-teal-100 selection:text-teal-900">
-      <main className="flex-1 p-6 sm:p-10 max-w-4xl mx-auto space-y-8 overflow-y-auto">
-        
-        {/* Top Duty Banner */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-3xl border border-slate-200/70 shadow-sm">
-          <div className="flex items-center gap-3">
-            <span className={`w-3 h-3 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`} />
-            <div>
-              <h2 className="text-sm font-bold text-slate-900">
-                {isOnline ? 'You Are On-Duty • Receiving Estate Rides' : 'Offline • Duty Paused'}
-              </h2>
-              <p className="text-xs text-slate-500">
-                Assigned Unit: Golf Estate EV Shuttle #04
-              </p>
-            </div>
-          </div>
+    <div className="mx-auto max-w-6xl p-6 lg:p-10 space-y-10">
 
-          <button
-            type="button"
-            onClick={() => setIsOnline(!isOnline)}
-            className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-xs transition cursor-pointer ${
-              isOnline
-                ? 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
-                : 'bg-[#004B4F] text-white hover:bg-[#00383b] shadow-sm'
-            }`}
-          >
-            <Power className="w-3.5 h-3.5" />
-            <span>{isOnline ? 'Go Offline' : 'Go Online'}</span>
-          </button>
+      {/* ── Header: Duty Status & Metrics ── */}
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-8">
+        <div className="flex items-center gap-6">
+          <div className="relative">
+             <div className={`w-20 h-20 rounded-[2rem] flex items-center justify-center transition-all ${isOnline ? 'bg-emerald-500 text-white shadow-xl shadow-emerald-500/20' : 'bg-slate-200 text-slate-400'}`}>
+                <Power className={`w-10 h-10 ${isOnline ? 'animate-pulse' : ''}`} />
+             </div>
+             <button
+                onClick={() => setIsOnline(!isOnline)}
+                className={`absolute -bottom-2 -right-2 h-10 px-4 rounded-full font-black text-[10px] uppercase tracking-widest border-4 border-slate-50 transition-all ${isOnline ? 'bg-rose-500 text-white' : 'bg-emerald-600 text-white'}`}
+             >
+                {isOnline ? 'Off-Duty' : 'On-Duty'}
+             </button>
+          </div>
+          <div className="space-y-1">
+             <h1 className="text-2xl font-black text-slate-900 tracking-tight leading-none">{isOnline ? 'System Online' : 'System Paused'}</h1>
+             <div className="flex items-center gap-3">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Fleet #04</span>
+                <span className="h-1 w-1 rounded-full bg-slate-300" />
+                <span className="text-xs font-bold text-emerald-600 uppercase tracking-widest">82% Battery</span>
+             </div>
+          </div>
         </div>
 
-        {/* Driver Account Balance Card */}
-        <div className="bg-white rounded-3xl p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-6 border border-slate-200/60 shadow-sm">
-          <div>
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-              <Wallet className="w-3.5 h-3.5 text-slate-400" />
-              Driver Earnings Balance
-            </span>
-            <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight mt-1 text-slate-900">
-              ₦{(profile?.wallet_balance ?? 0).toLocaleString('en-NG', { minimumFractionDigits: 2 })}
-            </h2>
-            <div className="flex items-center gap-4 mt-2 text-xs text-slate-500">
-              <span>Today&apos;s Runs: <strong className="text-slate-800">{recentTrips.length} Completed</strong></span>
-              <span>•</span>
-              <span>Settlement: <strong className="text-emerald-700">Direct to Bank</strong></span>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => {
-              setWithdrawError(null);
-              setIsWithdrawOpen(true);
-            }}
-            className="flex items-center justify-center gap-2 bg-[#004B4F] hover:bg-[#00383b] text-white text-xs font-bold px-6 py-3.5 rounded-full transition shadow-md shadow-teal-950/10 active:scale-95 cursor-pointer self-start sm:self-center"
-          >
-            <ArrowDownLeft className="w-4 h-4 text-emerald-300" />
-            <span>Withdraw Funds</span>
-          </button>
+        <div className="flex items-center gap-4 bg-white p-3 rounded-[2rem] border border-slate-100 shadow-sm">
+           <div className="px-6 py-1 border-r border-slate-100">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5 text-center">Earnings</p>
+              <p className="text-3xl font-black text-slate-900 leading-none">{profile?.wallet_balance.toFixed(1)} <span className="text-xs font-bold text-slate-400">hp</span></p>
+           </div>
+           <button
+              onClick={() => setIsWithdrawOpen(true)}
+              className="h-14 px-6 bg-slate-900 text-white rounded-2xl hover:bg-black transition active:scale-95 flex items-center gap-3"
+           >
+              <span className="text-xs font-black uppercase tracking-widest">Withdraw</span>
+              <ArrowDownLeft className="w-4 h-4 text-emerald-400" />
+           </button>
         </div>
+      </header>
 
-        {/* ── Active Ride Dispatch Card ────────────────────────── */}
-        <div className="bg-white border border-slate-200/70 rounded-3xl p-6 sm:p-8 space-y-6 shadow-sm">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-            <div className="flex items-center gap-2">
-              <Car className="w-4 h-4 text-[#004B4F]" />
-              <h3 className="text-base font-bold text-slate-900">Active Trip Dispatch</h3>
-            </div>
-            {activeTrip && (
-              <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
-                {activeTrip.status.toUpperCase()}
-              </span>
-            )}
-          </div>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
 
-          {!activeTrip ? (
-            <div className="py-10 text-center space-y-2">
-              <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto text-slate-400">
-                <Navigation className="w-5 h-5" />
-              </div>
-              <p className="text-sm font-bold text-slate-800">No Active Ride Requests</p>
-              <p className="text-xs text-slate-400 max-w-xs mx-auto">
-                {isOnline
-                  ? 'Listening for incoming orders across Golf Estate. Nearby resident trips will appear here automatically.'
-                  : 'You are currently offline. Switch your status to online above to receive trip calls.'}
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-200/70">
+        {/* ── Active Dispatch Terminal ── */}
+        <div className="lg:col-span-7 space-y-6">
+          <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/40 overflow-hidden">
+             <div className="p-8 border-b border-slate-50 flex items-center justify-between bg-slate-50/50">
                 <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-full bg-[#004B4F] text-white flex items-center justify-center font-black text-sm">
-                    {activeTrip.passengerName.charAt(0)}
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-slate-900">{activeTrip.passengerName}</h4>
-                    <p className="text-xs text-slate-500">Golf Estate Resident • {activeTrip.serviceType}</p>
-                  </div>
+                   <Activity className="w-5 h-5 text-teal-600" />
+                   <h2 className="text-lg font-black text-slate-900 tracking-tight uppercase tracking-widest">Live Dispatch Radar</h2>
                 </div>
+                {activeTrip && <span className="px-3 py-1 rounded-full bg-orange-100 text-orange-600 text-[10px] font-black uppercase italic animate-pulse">Request Active</span>}
+             </div>
 
-                <div className="flex items-center gap-3 self-end sm:self-center">
-                  <div className="text-right">
-                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Fare Payout</span>
-                    <span className="text-lg font-black text-[#004B4F]">₦{activeTrip.fare.toLocaleString()}</span>
-                  </div>
-                  <a
-                    href={`tel:${activeTrip.passengerPhone}`}
-                    className="w-9 h-9 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center shadow-xs transition"
-                  >
-                    <Phone className="w-4 h-4" />
-                  </a>
-                </div>
-              </div>
+             <div className="p-8">
+                {!activeTrip ? (
+                   <div className="py-20 text-center space-y-4">
+                      <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto text-slate-200">
+                         <Zap className="w-10 h-10" />
+                      </div>
+                      <div className="space-y-1">
+                         <p className="text-lg font-black text-slate-900 tracking-tight">No Incoming Requests</p>
+                         <p className="text-xs text-slate-400 font-medium max-w-[280px] mx-auto">
+                            {isOnline ? 'Scanning Golf Estate for resident transit calls. Maintain Sector 1 patrol.' : 'Switch to On-Duty to begin receiving trip dispatches.'}
+                         </p>
+                      </div>
+                   </div>
+                ) : (
+                   <div className="space-y-8 animate-in fade-in slide-in-from-top-4">
+                      <div className="flex items-center justify-between p-6 bg-slate-900 rounded-3xl text-white">
+                         <div className="flex items-center gap-4">
+                            <div className="w-14 h-14 rounded-2xl bg-teal-400 text-slate-900 flex items-center justify-center text-xl font-black">{activeTrip.passengerName.charAt(0)}</div>
+                            <div className="space-y-0.5">
+                               <h4 className="text-lg font-black tracking-tight">{activeTrip.passengerName}</h4>
+                               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{activeTrip.serviceType} • Sector 1</p>
+                            </div>
+                         </div>
+                         <div className="text-right">
+                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none mb-1">Fare Payout</p>
+                            <p className="text-2xl font-black text-teal-400 leading-none">{activeTrip.fare.toFixed(1)} hp</p>
+                         </div>
+                      </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                <div className="p-3.5 rounded-2xl bg-teal-50/70 border border-teal-100">
-                  <span className="text-[10px] font-bold text-teal-800 uppercase tracking-wider block mb-1">
-                    Pickup Location
-                  </span>
-                  <div className="flex items-center gap-2 text-slate-800 font-bold">
-                    <MapPin className="w-4 h-4 text-[#004B4F] shrink-0" />
-                    <span>{activeTrip.pickup}</span>
-                  </div>
-                </div>
+                      <div className="relative pl-6 space-y-6 before:absolute before:left-1 before:top-2 before:bottom-2 before:w-px before:bg-slate-100">
+                         <div className="relative">
+                            <MapPin className="absolute -left-7 top-1/2 -translate-y-1/2 w-4 h-4 text-teal-500" />
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Pickup Coordinate</p>
+                            <p className="text-sm font-black text-slate-900 leading-tight">{activeTrip.pickup}</p>
+                         </div>
+                         <div className="relative">
+                            <Navigation className="absolute -left-7 top-1/2 -translate-y-1/2 w-4 h-4 text-orange-500" />
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Destination</p>
+                            <p className="text-sm font-black text-slate-900 leading-tight">{activeTrip.dropoff}</p>
+                         </div>
+                      </div>
 
-                <div className="p-3.5 rounded-2xl bg-orange-50/70 border border-orange-100">
-                  <span className="text-[10px] font-bold text-[#FF7A00] uppercase tracking-wider block mb-1">
-                    Destination
-                  </span>
-                  <div className="flex items-center gap-2 text-slate-800 font-bold">
-                    <Navigation className="w-4 h-4 text-[#FF7A00] shrink-0" />
-                    <span>{activeTrip.dropoff}</span>
-                  </div>
-                </div>
-              </div>
-
-              {activeTrip.status === 'incoming' && (
-                <div className="grid grid-cols-2 gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={handleDeclineTrip}
-                    className="w-full py-3.5 rounded-full border border-slate-200 text-slate-700 hover:bg-slate-100 font-bold text-xs transition cursor-pointer"
-                  >
-                    Decline
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleAcceptTrip}
-                    className="w-full py-3.5 rounded-full bg-[#004B4F] hover:bg-[#00383b] text-white font-bold text-xs transition shadow-md shadow-teal-950/15 cursor-pointer"
-                  >
-                    Accept Trip (₦{activeTrip.fare.toLocaleString()})
-                  </button>
-                </div>
-              )}
-
-              {activeTrip.status === 'accepted' && (
-                <button
-                  type="button"
-                  onClick={() => handleUpdateTripStage('arrived')}
-                  className="w-full bg-[#FF7A00] hover:bg-[#e66e00] text-white font-bold text-xs py-3.5 rounded-full transition shadow-md shadow-orange-500/20 active:scale-[0.99] cursor-pointer"
-                >
-                  Arrived at Passenger Pickup
-                </button>
-              )}
-
-              {activeTrip.status === 'arrived' && (
-                <button
-                  type="button"
-                  onClick={() => handleUpdateTripStage('in_progress')}
-                  className="w-full bg-[#004B4F] hover:bg-[#00383b] text-white font-bold text-xs py-3.5 rounded-full transition shadow-md shadow-teal-950/20 active:scale-[0.99] cursor-pointer"
-                >
-                  Passenger Onboard • Start Trip
-                </button>
-              )}
-
-              {activeTrip.status === 'in_progress' && (
-                <button
-                  type="button"
-                  onClick={() => handleUpdateTripStage('completed')}
-                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-3.5 rounded-full transition shadow-md shadow-emerald-600/25 active:scale-[0.99] cursor-pointer"
-                >
-                  Complete Trip & Collect ₦{activeTrip.fare.toLocaleString()}
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* ── Recent Rides Manifest ────────────────────────────── */}
-        <div className="bg-white border border-slate-200/70 rounded-3xl p-6 sm:p-8 space-y-4 shadow-sm">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-            <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4 text-slate-400" />
-              <h3 className="text-base font-bold text-slate-900">Recent Completed Trips</h3>
-            </div>
-            <span className="text-xs font-medium text-slate-400">Shift audit logs</span>
-          </div>
-
-          <div className="divide-y divide-slate-100">
-            {recentTrips.map((trip) => (
-              <div key={trip.id} className="py-4 flex items-center justify-between gap-4">
-                <div>
-                  <div className="text-xs font-bold text-slate-800 flex items-center gap-2">
-                    <span>{trip.pickup}</span>
-                    <span className="text-slate-300">→</span>
-                    <span>{trip.dropoff}</span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 mt-1">
-                    {trip.passenger} • {trip.type} • {trip.date}
-                  </p>
-                </div>
-                <span className="text-xs font-extrabold text-[#004B4F] shrink-0">
-                  {trip.payout}
-                </span>
-              </div>
-            ))}
-          </div>
-
-          <div className="pt-2 text-center">
-            <button
-              type="button"
-              onClick={() => router.push('/driver/history')}
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 transition py-2 px-5 rounded-full bg-slate-100 hover:bg-slate-200 cursor-pointer"
-            >
-              <span>View Full Trip Manifest</span>
-              <ArrowUpRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-
-      </main>
-
-      {/* ── Withdraw Funds Modal ───────────────────────────────── */}
-      {isWithdrawOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-slate-100 space-y-6 animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="space-y-0.5">
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-50 border border-amber-100 text-[10px] font-bold text-amber-800">
-                  <Building2 className="w-3 h-3 text-amber-600" />
-                  <span>Driver Settlement</span>
-                </div>
-                <h3 className="text-base font-bold text-slate-900 pt-1">
-                  Withdraw Shift Earnings
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsWithdrawOpen(false)}
-                className="p-1 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {withdrawSuccess ? (
-              <div className="py-8 text-center space-y-3">
-                <div className="w-14 h-14 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-full flex items-center justify-center mx-auto">
-                  <Check className="w-7 h-7 stroke-[3]" />
-                </div>
-                <h4 className="text-base font-bold text-slate-900">Payout Processed!</h4>
-                <p className="text-xs text-slate-500 max-w-xs mx-auto">
-                  ₦{Number(withdrawAmount).toLocaleString()} has been queued for immediate settlement to your {selectedBank} account.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="bg-slate-50 border border-slate-200/70 p-3 rounded-2xl flex items-center justify-between text-xs">
-                  <span className="text-slate-500">Available to withdraw:</span>
-                  <span className="font-extrabold text-slate-900">
-                    ₦{(profile?.wallet_balance ?? 0).toLocaleString('en-NG', { minimumFractionDigits: 2 })}
-                  </span>
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
-                    Amount to Withdraw (₦)
-                  </label>
-                  <div className="flex items-center bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 focus-within:border-[#004B4F] focus-within:bg-white transition">
-                    <span className="text-slate-400 font-bold text-sm mr-2">₦</span>
-                    <input
-                      type="number"
-                      min="500"
-                      max={profile?.wallet_balance ?? 0}
-                      placeholder="e.g. 5000"
-                      value={withdrawAmount}
-                      onChange={(e) => setWithdrawAmount(e.target.value)}
-                      className="bg-transparent outline-none w-full text-slate-900 font-bold text-sm"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setWithdrawAmount(String(profile?.wallet_balance ?? 0))}
-                      className="text-[10px] font-bold text-[#004B4F] bg-teal-50 px-2.5 py-1 rounded-md hover:bg-teal-100 transition cursor-pointer"
-                    >
-                      MAX
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
-                    Destination Bank
-                  </label>
-                  <select
-                    value={selectedBank}
-                    onChange={(e) => setSelectedBank(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-xs font-medium rounded-xl px-3.5 py-2.5 outline-none focus:border-[#004B4F] focus:bg-white cursor-pointer transition"
-                  >
-                    {NIGERIAN_BANKS.map((b) => (
-                      <option key={b} value={b}>{b}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
-                    Account Number (10 Digits)
-                  </label>
-                  <input
-                    type="text"
-                    maxLength={10}
-                    placeholder="0123456789"
-                    value={accountNumber}
-                    onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, ''))}
-                    className="w-full bg-slate-50 border border-slate-200 text-slate-900 font-bold text-xs rounded-xl px-3.5 py-2.5 outline-none focus:border-[#004B4F] focus:bg-white transition"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
-                    Beneficiary Account Name
-                  </label>
-                  <input
-                    type="text"
-                    value={accountName}
-                    onChange={(e) => setAccountName(e.target.value)}
-                    placeholder="Driver Account Name"
-                    className="w-full bg-slate-50 border border-slate-200 text-slate-900 font-bold text-xs rounded-xl px-3.5 py-2.5 outline-none focus:border-[#004B4F] focus:bg-white transition"
-                  />
-                </div>
-
-                {withdrawError && (
-                  <div className="flex items-center gap-2 p-3 bg-rose-50 border border-rose-100 rounded-xl text-xs text-rose-600 font-semibold">
-                    <AlertCircle className="w-4 h-4 shrink-0" />
-                    <span>{withdrawError}</span>
-                  </div>
+                      <div className="pt-4 space-y-3">
+                         {activeTrip.status === 'incoming' && (
+                            <div className="grid grid-cols-2 gap-3">
+                               <button onClick={() => setActiveTrip(null)} className="h-16 rounded-2xl border-2 border-slate-100 font-black text-slate-400 hover:bg-slate-50 transition">Decline</button>
+                               <button onClick={handleAcceptTrip} className="h-16 rounded-2xl bg-teal-600 text-white font-black hover:bg-teal-700 transition shadow-xl shadow-teal-900/20">Accept Request</button>
+                            </div>
+                         )}
+                         {activeTrip.status === 'accepted' && (
+                            <button onClick={() => handleUpdateTripStage('arrived')} className="w-full h-16 bg-orange-500 text-white rounded-2xl font-black hover:bg-orange-600 transition shadow-xl shadow-orange-900/20">Arrived at Pickup</button>
+                         )}
+                         {activeTrip.status === 'arrived' && (
+                            <button onClick={() => handleUpdateTripStage('in_progress')} className="w-full h-16 bg-teal-600 text-white rounded-2xl font-black hover:bg-teal-700 transition shadow-xl shadow-teal-900/20">Passenger Onboard • Start</button>
+                         )}
+                         {activeTrip.status === 'in_progress' && (
+                            <button onClick={() => handleUpdateTripStage('completed')} className="w-full h-16 bg-emerald-600 text-white rounded-2xl font-black hover:bg-emerald-700 transition shadow-xl shadow-emerald-900/20 flex items-center justify-center gap-2"><CheckCircle2 className="w-5 h-5" /> Complete & Settle Fare</button>
+                         )}
+                      </div>
+                   </div>
                 )}
+             </div>
+          </div>
+        </div>
 
-                <button
-                  type="button"
-                  disabled={isProcessingWithdraw || (profile?.wallet_balance ?? 0) < 500}
-                  onClick={handleProcessWithdrawal}
-                  className="w-full bg-[#004B4F] hover:bg-[#00383b] text-white text-xs font-bold py-3.5 rounded-full transition shadow-md shadow-teal-950/10 active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                >
-                  {isProcessingWithdraw ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Sending to {selectedBank}...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>Confirm & Withdraw ₦{withdrawAmount ? Number(withdrawAmount).toLocaleString() : '0.00'}</span>
-                      <ArrowDownLeft className="w-4 h-4" />
-                    </>
-                  )}
-                </button>
+        {/* ── Shift Manifest & History ── */}
+        <div className="lg:col-span-5 space-y-8">
+           <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white relative overflow-hidden border border-slate-800">
+              <div className="relative z-10 space-y-8">
+                 <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                       <Clock className="w-5 h-5 text-teal-400" />
+                       <h3 className="text-sm font-black uppercase tracking-widest">Shift Log</h3>
+                    </div>
+                    <button onClick={() => router.push('/driver/history')} className="text-[10px] font-black text-slate-500 hover:text-white transition uppercase tracking-widest">Manifest</button>
+                 </div>
+
+                 <div className="space-y-4">
+                    {recentTrips.map((trip) => (
+                       <div key={trip.id} className="p-5 bg-white/5 border border-white/5 rounded-3xl hover:bg-white/10 transition cursor-default">
+                          <div className="flex justify-between items-start gap-4">
+                             <div className="space-y-1">
+                                <p className="text-xs font-black leading-none">{trip.pickup} → {trip.dropoff}</p>
+                                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{trip.passenger} • {trip.date}</p>
+                             </div>
+                             <span className="text-sm font-black text-teal-400">{trip.payout}</span>
+                          </div>
+                       </div>
+                    ))}
+                 </div>
               </div>
-            )}
+              <div className="absolute -bottom-12 -right-12 w-48 h-48 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
+           </div>
+
+           <div className="bg-white rounded-3xl border border-slate-100 p-6 flex items-center justify-between shadow-sm">
+              <div className="flex items-center gap-4">
+                 <div className="w-12 h-12 rounded-2xl bg-orange-50 flex items-center justify-center text-orange-600"><ShieldCheck className="w-6 h-6" /></div>
+                 <div>
+                    <p className="text-xs font-black text-slate-900 leading-none">Security Verified Unit</p>
+                    <p className="text-[10px] text-slate-500 font-medium">Auto-barrier clearance active</p>
+                 </div>
+              </div>
+              <History className="w-5 h-5 text-slate-100" />
+           </div>
+        </div>
+      </div>
+
+      {/* ── Withdraw Modal ── */}
+      {isWithdrawOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-[2.5rem] max-w-md w-full overflow-hidden shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-8 space-y-8">
+              <div className="flex items-start justify-between">
+                <div className="space-y-1">
+                  <h3 className="text-2xl font-black text-slate-900 tracking-tight leading-tight">Settlement Payout</h3>
+                  <p className="text-xs text-slate-500 font-medium italic">Convert hp credits to bank settlement.</p>
+                </div>
+                <button onClick={() => setIsWithdrawOpen(false)} className="p-2 rounded-full hover:bg-slate-100 transition"><X className="w-5 h-5 text-slate-400" /></button>
+              </div>
+
+              {withdrawSuccess ? (
+                <div className="py-12 text-center space-y-4">
+                  <div className="w-20 h-20 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto border-4 border-white shadow-xl"><CheckCircle2 className="w-10 h-10" /></div>
+                  <h4 className="text-xl font-black text-slate-900">Payout Scheduled</h4>
+                  <p className="text-xs text-slate-500 max-w-[240px] mx-auto">Credit conversion to NGN queued for immediate bank settlement.</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  <div className="p-6 bg-slate-900 rounded-[2rem] text-white flex items-center justify-between">
+                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Available to Settlement</span>
+                     <span className="text-2xl font-black text-teal-400">{profile?.wallet_balance.toFixed(1)} hp</span>
+                  </div>
+
+                  <div className="space-y-4">
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">hp to Withdraw</label>
+                        <input type="number" placeholder="1.0" value={withdrawAmount} onChange={(e) => setWithdrawAmount(e.target.value)} className="w-full h-14 px-5 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-black outline-none focus:bg-white focus:border-teal-500 transition-all" />
+                     </div>
+
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Bank Destination</label>
+                        <select value={selectedBank} onChange={(e) => setSelectedBank(e.target.value)} className="w-full h-14 px-5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold outline-none appearance-none cursor-pointer">{NIGERIAN_BANKS.map(b => <option key={b} value={b}>{b}</option>)}</select>
+                     </div>
+
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">NUBAN Number</label>
+                        <input type="text" maxLength={10} value={accountNumber} onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g,''))} className="w-full h-14 px-5 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold outline-none focus:bg-white focus:border-teal-500 transition-all" />
+                     </div>
+                  </div>
+
+                  {withdrawError && <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl text-[11px] font-bold text-rose-600 flex items-center gap-2"><AlertCircle className="w-4 h-4 shrink-0" /><span>{withdrawError}</span></div>}
+
+                  <button
+                    disabled={isProcessingWithdraw || (profile?.wallet_balance ?? 0) < 1}
+                    onClick={handleProcessWithdrawal}
+                    className="w-full h-16 bg-teal-600 text-white rounded-2xl font-black hover:bg-teal-700 transition active:scale-[0.99] flex items-center justify-center gap-3 shadow-xl shadow-teal-900/20"
+                  >
+                    {isProcessingWithdraw ? <Loader2 className="w-5 h-5 animate-spin" /> : <><span>Settle hp to Bank</span><ArrowDownLeft className="w-5 h-5" /></>}
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
-
     </div>
   );
 }

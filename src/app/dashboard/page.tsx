@@ -9,7 +9,6 @@ import {
   Wallet,
   MapPin,
   Navigation,
-  Clock,
   Plus,
   Loader2,
   ChevronDown,
@@ -22,6 +21,9 @@ import {
   CheckCircle2,
   AlertCircle,
   ArrowRight,
+  Car,
+  Clock,
+  History,
 } from 'lucide-react';
 
 interface Profile {
@@ -49,36 +51,27 @@ const ESTATE_LOCATIONS = [
   'JDP Round about',
 ];
 
-const RECENT_TRIPS = [
+const RECENT_TRIPS_MOCK = [
   {
     id: 'TRP-104',
     pickup: 'Phase 1 Gatehouse',
     dropoff: 'Clubhouse & Recreation Center',
-    date: 'Today, 2:15 PM',
-    fare: '₦500',
-    type: 'Electric Shuttle',
+    date: '2:15 PM',
+    fare: '0.9 hp',
+    type: 'Shuttle',
   },
   {
     id: 'TRP-103',
-    pickup: 'Road 4 Residential Zone',
-    dropoff: 'Golf Estate Main Gate',
-    date: 'Yesterday, 6:40 PM',
-    fare: '₦2,500',
+    pickup: 'Road 4 Residential',
+    dropoff: 'Main Gate',
+    date: 'Yesterday',
+    fare: '4.6 hp',
     type: 'Private EV',
-  },
-  {
-    id: 'TRP-102',
-    pickup: 'Peter Odili Exit Link',
-    dropoff: 'Sports Pavilion & Tennis Court',
-    date: '22 Sept 2026, 8:10 AM',
-    fare: '₦500',
-    type: 'Electric Shuttle',
   },
 ];
 
 type ModalStage = 'confirming' | 'searching' | 'assigned';
-
-const FUNDING_PRESETS = [500, 1000, 2500, 5000, 10000];
+const FUNDING_PRESETS = [1.0, 5.0, 10.0, 20.0];
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -90,43 +83,41 @@ export default function DashboardPage() {
   const [dropoff, setDropoff] = useState(ESTATE_LOCATIONS[3]);
   const [serviceType, setServiceType] = useState<'shuttle' | 'private'>('shuttle');
 
-  // Active Dispatch & Realtime Ride Tracking State
+  // Active Dispatch State
   const [activeModalOpen, setActiveModalOpen] = useState(false);
+  const { onlineCount } = useDriverPresence('resident');
   const [modalStage, setModalStage] = useState<ModalStage>('confirming');
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [activeRideId, setActiveRideId] = useState<string | null>(null);
   const [assignedDriver, setAssignedDriver] = useState<AssignedDriverInfo | null>(null);
   const rideChannelRef = useRef<RealtimeChannel | null>(null);
 
-  // Add Funds Modal State (Bachs Integration)
+  // Add Funds State
   const [isAddFundsOpen, setIsAddFundsOpen] = useState(false);
+<<<<<<< HEAD
   const { onlineDrivers } = useDriverPresence('resident');
   const [fundAmount, setFundAmount] = useState<number>(1000);
+=======
+  const [fundAmount, setFundAmount] = useState<number>(5.0);
+>>>>>>> f3e5972a8d5ee6cd148b7c8afb14664e618b3c20
   const [customFundAmount, setCustomFundAmount] = useState<string>('');
   const [isProcessingFunding, setIsProcessingFunding] = useState(false);
   const [fundingError, setFundingError] = useState<string | null>(null);
 
-  const numericFare = serviceType === 'shuttle' ? 500 : 2500;
-  const tripFareFormatted = serviceType === 'shuttle' ? '₦500' : '₦2,500';
+  const numericFare = serviceType === 'shuttle' ? 0.9 : 4.6;
+  const tripFareFormatted = `${numericFare.toFixed(1)} hp`;
   const hasSufficientBalance = (profile?.wallet_balance ?? 0) >= numericFare;
 
-  // Cleanup Supabase Realtime channel subscription on unmount
   useEffect(() => {
     return () => {
-      if (rideChannelRef.current) {
-        supabase.removeChannel(rideChannelRef.current);
-      }
+      if (rideChannelRef.current) supabase.removeChannel(rideChannelRef.current);
     };
   }, []);
 
   useEffect(() => {
     async function loadUserData() {
       try {
-        const {
-          data: { user },
-          error: authError,
-        } = await supabase.auth.getUser();
-
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
         if (authError || !user) {
           router.replace('/login');
           return;
@@ -143,7 +134,7 @@ export default function DashboardPage() {
             id: user.id,
             email: user.email || '',
             full_name: user.user_metadata?.full_name || 'Resident',
-            wallet_balance: 1500,
+            wallet_balance: 2.8,
           });
         } else {
           setProfile(profileData);
@@ -154,75 +145,26 @@ export default function DashboardPage() {
         setLoading(false);
       }
     }
-
     loadUserData();
   }, [router]);
 
-  // Handle successful Bachs payment redirect and credit wallet in Supabase
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const query = new URLSearchParams(window.location.search);
-    const paymentStatus = query.get('payment');
-    const creditedAmount = query.get('amount');
-
-    if (paymentStatus === 'success' && creditedAmount && profile) {
-      const addedVal = Number(creditedAmount);
-      const targetUserId = profile.id;
-      const currentBalance = profile.wallet_balance ?? 0;
-      const newBalance = currentBalance + addedVal;
-
-      async function creditWallet() {
-        await supabase
-          .from('profiles')
-          .update({ wallet_balance: newBalance })
-          .eq('id', targetUserId);
-
-        setProfile((prev) =>
-          prev ? { ...prev, wallet_balance: newBalance } : null
-        );
-
-        window.history.replaceState({}, '', '/dashboard');
-        alert(`Successfully funded wallet with ₦${addedVal.toLocaleString()} via Bachs!`);
-      }
-
-      creditWallet();
-    }
-  }, [profile]);
-
-  // Step 1: Open Confirmation & Ride Payment Drawer
   const handleOpenBookingSummary = () => {
     if (pickup === dropoff) {
-      alert('Pickup and drop-off cannot be the same point in the estate.');
+      alert('Pickup and drop-off cannot be the same point.');
       return;
     }
     setModalStage('confirming');
     setActiveModalOpen(true);
   };
 
-  // Step 2: Confirm, Deduct Wallet Balance, Insert to 'rides' table & Listen for Driver Response
   const handleConfirmAndPay = async () => {
-    if (!hasSufficientBalance) {
-      alert('Insufficient wallet balance. Please add funds to proceed.');
-      return;
-    }
-
-    if (!profile) return;
-
+    if (!hasSufficientBalance || !profile) return;
     setIsProcessingPayment(true);
-
     try {
       const updatedBalance = (profile.wallet_balance ?? 0) - numericFare;
-
-      // 1. Debit Resident Wallet Balance
-      await supabase
-        .from('profiles')
-        .update({ wallet_balance: updatedBalance })
-        .eq('id', profile.id);
-
+      await supabase.from('profiles').update({ wallet_balance: updatedBalance }).eq('id', profile.id);
       setProfile((prev) => (prev ? { ...prev, wallet_balance: updatedBalance } : null));
 
-      // 2. Insert into the 'rides' table with status 'pending'
       const { data: newRide, error: rideError } = await supabase
         .from('rides')
         .insert({
@@ -234,91 +176,54 @@ export default function DashboardPage() {
           service_type: serviceType,
           status: 'pending',
         })
-        .select()
-        .single();
+        .select().single();
 
-      if (rideError || !newRide) {
-        throw new Error(rideError?.message || 'Failed to dispatch ride to estate fleet.');
-      }
+      if (rideError || !newRide) throw new Error(rideError?.message || 'Dispatch failed.');
 
       setActiveRideId(newRide.id);
       setModalStage('searching');
       setIsProcessingPayment(false);
 
-      // 3. Remove existing channel if any
-      if (rideChannelRef.current) {
-        supabase.removeChannel(rideChannelRef.current);
-      }
-
-      // 4. Subscribe to Supabase Realtime channel for driver response
-      const channel = supabase
-        .channel(`ride_status_${newRide.id}`)
-        .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'rides',
-            filter: `id=eq.${newRide.id}`,
-          },
-          (payload) => {
-            const updated = payload.new as {
-              status: string;
-              driver_name: string | null;
-              cab_number: string | null;
-              security_pin: string | null;
-            };
-
-            if (updated.status === 'accepted') {
-              setAssignedDriver({
-                name: updated.driver_name || 'Assigned Driver',
-                phone: '+2348000000000',
-                cabNumber: updated.cab_number || 'EV Cab #04',
-                securityPin: updated.security_pin || '4821',
-                eta: '3 Mins',
-              });
-              setModalStage('assigned');
-            } else if (updated.status === 'canceled') {
-              alert('Ride was canceled or declined by the driver.');
-              handleCancelTrip();
-            }
+      if (rideChannelRef.current) supabase.removeChannel(rideChannelRef.current);
+      const channel = supabase.channel(`ride_status_${newRide.id}`)
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rides', filter: `id=eq.${newRide.id}` },
+        (payload) => {
+          const updated = payload.new as any;
+          if (updated.status === 'accepted') {
+            setAssignedDriver({
+              name: updated.driver_name || 'Assigned Driver',
+              phone: '+234 800 000 0000',
+              cabNumber: updated.cab_number || 'EV Unit #04',
+              securityPin: updated.security_pin || '4821',
+              eta: '3 Mins',
+            });
+            setModalStage('assigned');
+          } else if (updated.status === 'canceled') {
+            alert('Ride was canceled.');
+            handleCancelTrip();
           }
-        )
-        .subscribe();
-
+        }).subscribe();
       rideChannelRef.current = channel;
     } catch (error) {
-      console.error('Payment/Dispatch failure:', error);
+      console.error('Dispatch failure:', error);
       setIsProcessingPayment(false);
-      alert('Could not complete ride booking. Please try again.');
+      alert('Dispatch failed. Please try again.');
     }
   };
 
   const handleCancelTrip = async () => {
     if (activeRideId && modalStage === 'searching') {
-      // Mark ride as canceled in Supabase
-      await supabase
-        .from('rides')
-        .update({ status: 'canceled' })
-        .eq('id', activeRideId);
-
-      // Refund the numeric fare if still searching
+      await supabase.from('rides').update({ status: 'canceled' }).eq('id', activeRideId);
       if (profile?.id) {
         const refunded = (profile.wallet_balance ?? 0) + numericFare;
-        await supabase
-          .from('profiles')
-          .update({ wallet_balance: refunded })
-          .eq('id', profile.id);
-
+        await supabase.from('profiles').update({ wallet_balance: refunded }).eq('id', profile.id);
         setProfile((prev) => (prev ? { ...prev, wallet_balance: refunded } : null));
       }
     }
-
     if (rideChannelRef.current) {
       supabase.removeChannel(rideChannelRef.current);
       rideChannelRef.current = null;
     }
-
     setActiveRideId(null);
     setActiveModalOpen(false);
     setModalStage('confirming');
@@ -326,51 +231,32 @@ export default function DashboardPage() {
     setAssignedDriver(null);
   };
 
-  // Step 3: Trigger Bachs Gateway for Wallet Funding
   const handleInitiateAddFunds = async () => {
     const finalAmount = customFundAmount ? Number(customFundAmount) : fundAmount;
-
-    if (!finalAmount || finalAmount < 100) {
-      setFundingError('Minimum wallet top-up is ₦100');
+    if (!finalAmount || finalAmount < 0.1) {
+      setFundingError('Minimum top-up is 0.1 hp');
       return;
     }
-
     setIsProcessingFunding(true);
-    setFundingError(null);
-
     try {
       const res = await fetch('/api/funds/bachs/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount: finalAmount,
-          email: profile?.email || 'resident@gulfestate.ng',
-          userId: profile?.id,
-        }),
+        body: JSON.stringify({ amount: finalAmount * 537.5, email: profile?.email, userId: profile?.id }),
       });
-
       const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to initialize Bachs payment session');
-      }
-
-      if (data.checkoutUrl) {
-        window.location.href = data.checkoutUrl;
-      } else {
-        throw new Error('No checkout URL returned from Bachs.');
-      }
-    } catch (err: unknown) {
-      console.error('Add funds error:', err);
-      setFundingError((err as Error).message || 'Could not connect to payment gateway. Try again.');
+      if (!res.ok) throw new Error(data.error || 'Gateway error');
+      if (data.checkoutUrl) window.location.href = data.checkoutUrl;
+    } catch (err: any) {
+      setFundingError(err.message);
       setIsProcessingFunding(false);
     }
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-[#004B4F]" />
+      <div className="flex h-full items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
       </div>
     );
   }
@@ -378,38 +264,25 @@ export default function DashboardPage() {
   const effectiveFundingAmount = customFundAmount ? Number(customFundAmount) : fundAmount;
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex font-sans selection:bg-teal-100 selection:text-teal-900 overflow-hidden">
-      {/* ── Main Content Area ──────────────────────────────────── */}
-      <main className="flex-1 p-6 sm:p-10 max-w-4xl mx-auto space-y-8 overflow-y-auto">
-        
-        {/* Account Balance Card */}
-        <div className="bg-white rounded-3xl p-6 sm:p-8 flex items-center justify-between border border-slate-100 shadow-xl shadow-slate-200/50">
-          <div>
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-              <Wallet className="w-3.5 h-3.5 text-slate-400" />
-              Account Balance
-            </span>
-            <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight mt-1 text-slate-900">
-              ₦{(profile?.wallet_balance ?? 0).toLocaleString('en-NG', { minimumFractionDigits: 2 })}
-            </h2>
-            <p className="text-[11px] text-slate-500 mt-1">
-              Auto-deducted for internal Golf Estate trips
-            </p>
-          </div>
+    <div className="mx-auto max-w-6xl p-6 lg:p-10 space-y-10">
 
-          <button
-            type="button"
-            onClick={() => {
-              setFundingError(null);
-              setIsAddFundsOpen(true);
-            }}
-            className="flex items-center gap-2 bg-[#004B4F] hover:bg-[#00383b] text-white text-xs font-bold px-5 py-3 rounded-full transition shadow-md shadow-teal-950/10 active:scale-95 cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add Funds</span>
-          </button>
+      {/* ── Top Level Context & Navigation ── */}
+      <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div className="space-y-1">
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight leading-tight">
+            Welcome back, {profile?.full_name?.split(' ')[0]}
+          </h1>
+          <div className="flex items-center gap-3">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-bold border border-emerald-100">
+              <Zap className="w-3 h-3 fill-current" />
+              {onlineCount} {onlineCount === 1 ? 'Driver' : 'Drivers'} Available
+            </span>
+            <span className="text-slate-300">/</span>
+            <span className="text-xs font-medium text-slate-500">Golf Estate Sector 1</span>
+          </div>
         </div>
 
+<<<<<<< HEAD
         {/* Intra-Estate Booking Form */}
         <div className="bg-white border border-slate-100 rounded-3xl p-6 sm:p-8 space-y-6 shadow-xl shadow-slate-200/50">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -429,439 +302,340 @@ export default function DashboardPage() {
                   </>
                 )}
               </div>
+=======
+        <div className="flex items-center gap-3 bg-white p-2 rounded-2xl border border-slate-100 shadow-sm self-start md:self-auto">
+          <div className="px-4 py-2">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Wallet Balance</p>
+            <p className="text-2xl font-black text-slate-900 leading-none">
+              {profile?.wallet_balance.toFixed(1)} <span className="text-sm font-bold text-slate-400">hp</span>
+            </p>
+          </div>
+          <button
+            onClick={() => setIsAddFundsOpen(true)}
+            className="h-12 w-12 flex items-center justify-center bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition shadow-lg shadow-teal-900/10 active:scale-95"
+          >
+            <Plus className="w-5 h-5 stroke-[3]" />
+          </button>
+        </div>
+      </header>
+
+      {/* ── Main Operations Grid ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+
+        {/* Booking Terminal */}
+        <div className="lg:col-span-7 bg-white rounded-3xl border border-slate-100 shadow-xl shadow-slate-200/40 p-8 space-y-8">
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <h2 className="text-xl font-bold text-slate-900">Book Estate Transit</h2>
+              <p className="text-xs text-slate-500">Zero-emission electric vehicle dispatch</p>
+>>>>>>> f3e5972a8d5ee6cd148b7c8afb14664e618b3c20
             </div>
 
-            {/* Ride Mode Selector */}
-            <div className="inline-flex p-1 bg-slate-100 rounded-full self-start">
+            {/* Mode Switcher */}
+            <div className="inline-flex p-1 bg-slate-100 rounded-xl">
               <button
-                type="button"
                 onClick={() => setServiceType('shuttle')}
-                className={`text-xs font-bold px-4 py-1.5 rounded-full transition cursor-pointer ${
-                  serviceType === 'shuttle'
-                    ? 'bg-white text-slate-900 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-800'
+                className={`px-4 py-1.5 rounded-lg text-[11px] font-bold transition ${
+                  serviceType === 'shuttle' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
-                Shuttle (₦500)
+                Shuttle
               </button>
               <button
-                type="button"
                 onClick={() => setServiceType('private')}
-                className={`text-xs font-bold px-4 py-1.5 rounded-full transition cursor-pointer ${
-                  serviceType === 'private'
-                    ? 'bg-white text-slate-900 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-800'
+                className={`px-4 py-1.5 rounded-lg text-[11px] font-bold transition ${
+                  serviceType === 'private' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
-                Private EV (₦2,500)
+                Private EV
               </button>
             </div>
           </div>
 
-          {/* Location Selectors */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider">
-                Pickup Location
-              </label>
-              <div className="relative">
-                <MapPin className="w-4 h-4 text-[#004B4F] absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Pickup Coordinate</label>
+              <div className="relative group">
+                <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-teal-600 z-10" />
                 <select
                   value={pickup}
                   onChange={(e) => setPickup(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-xs font-medium rounded-2xl pl-11 pr-10 py-3.5 outline-none focus:border-[#004B4F] focus:bg-white appearance-none cursor-pointer transition"
+                  className="w-full h-14 pl-12 pr-10 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:border-teal-500 transition-all appearance-none cursor-pointer"
                 >
-                  {ESTATE_LOCATIONS.map((loc) => (
-                    <option key={loc} value={loc} className="bg-white text-slate-800">
-                      {loc}
-                    </option>
-                  ))}
+                  {ESTATE_LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}
                 </select>
-                <ChevronDown className="w-4 h-4 text-slate-400 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none group-focus-within:rotate-180 transition-transform" />
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider">
-                Drop-off Destination
-              </label>
-              <div className="relative">
-                <Navigation className="w-4 h-4 text-[#FF7A00] absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Drop-off Destination</label>
+              <div className="relative group">
+                <Navigation className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-orange-500 z-10" />
                 <select
                   value={dropoff}
                   onChange={(e) => setDropoff(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-xs font-medium rounded-2xl pl-11 pr-10 py-3.5 outline-none focus:border-[#FF7A00] focus:bg-white appearance-none cursor-pointer transition"
+                  className="w-full h-14 pl-12 pr-10 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:border-orange-500 transition-all appearance-none cursor-pointer"
                 >
-                  {ESTATE_LOCATIONS.map((loc) => (
-                    <option key={loc} value={loc} className="bg-white text-slate-800">
-                      {loc}
-                    </option>
-                  ))}
+                  {ESTATE_LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}
                 </select>
-                <ChevronDown className="w-4 h-4 text-slate-400 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none group-focus-within:rotate-180 transition-transform" />
               </div>
             </div>
           </div>
 
           <button
-            type="button"
             onClick={handleOpenBookingSummary}
-            className="w-full bg-[#FF7A00] hover:bg-[#e66e00] text-white text-xs font-bold py-3.5 rounded-full transition shadow-md shadow-orange-500/20 active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer mt-2"
+            className="w-full h-16 bg-slate-900 hover:bg-black text-white rounded-2xl flex items-center justify-center gap-3 transition group active:scale-[0.99] shadow-xl shadow-slate-900/10"
           >
-            <span>Confirm Payment ({tripFareFormatted})</span>
-            <ArrowUpRight className="w-4 h-4" />
+            <span className="font-bold tracking-tight">Confirm & Dispatch Ride</span>
+            <span className="h-6 w-px bg-white/20" />
+            <span className="font-black text-teal-400">{tripFareFormatted}</span>
+            <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
           </button>
         </div>
 
-        {/* Recent Rides */}
-        <div className="bg-white border border-slate-100 rounded-3xl p-6 sm:p-8 space-y-4 shadow-xl shadow-slate-200/50">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-            <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4 text-slate-400" />
-              <h3 className="text-base font-bold text-slate-900">Recent Rides</h3>
-            </div>
-            <span className="text-xs font-medium text-slate-400">Past activity</span>
-          </div>
-
-          <div className="divide-y divide-slate-100">
-            {RECENT_TRIPS.map((trip) => (
-              <div key={trip.id} className="py-4 flex items-center justify-between gap-4">
-                <div>
-                  <div className="text-xs font-bold text-slate-800 flex items-center gap-2">
-                    <span>{trip.pickup}</span>
-                    <span className="text-slate-300">→</span>
-                    <span>{trip.dropoff}</span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 mt-1">
-                    {trip.type} • {trip.date}
-                  </p>
+        {/* Sidebar Context */}
+        <div className="lg:col-span-5 space-y-6">
+          {/* Quick Recent Activity */}
+          <div className="bg-slate-900 rounded-3xl p-6 text-white overflow-hidden relative border border-slate-800">
+            <div className="relative z-10 space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <History className="w-4 h-4 text-teal-400" />
+                  <h3 className="text-sm font-bold tracking-tight">Recent Intra-Estate Activity</h3>
                 </div>
-                <span className="text-xs font-extrabold text-[#004B4F] shrink-0">
-                  {trip.fare}
-                </span>
+                <button onClick={() => router.push('/dashboard/history')} className="text-[10px] font-bold text-slate-400 hover:text-white transition uppercase tracking-widest">View All</button>
               </div>
-            ))}
+
+              <div className="space-y-3">
+                {RECENT_TRIPS_MOCK.map((trip) => (
+                  <div key={trip.id} className="group p-4 bg-white/5 border border-white/5 rounded-2xl hover:bg-white/10 transition cursor-default">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="space-y-1 min-w-0">
+                        <p className="text-[11px] font-bold truncate leading-none">{trip.pickup} → {trip.dropoff}</p>
+                        <p className="text-[10px] text-slate-500 font-medium">{trip.type} • {trip.date}</p>
+                      </div>
+                      <span className="text-xs font-black text-teal-400 shrink-0">{trip.fare}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {/* Visual Fluff */}
+            <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
           </div>
 
-          <div className="pt-2 text-center">
-            <button
-              type="button"
-              onClick={() => router.push('/dashboard/history')}
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 transition py-2 px-5 rounded-full bg-slate-100 hover:bg-slate-200 cursor-pointer"
-            >
-              <span>See More</span>
-              <ArrowUpRight className="w-3.5 h-3.5" />
-            </button>
+          {/* Support Widget */}
+          <div className="bg-white rounded-3xl border border-slate-100 p-6 flex items-center justify-between shadow-sm">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-orange-600">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <div className="space-y-0.5">
+                <p className="text-xs font-bold text-slate-900 leading-none">Security Verified Transit</p>
+                <p className="text-[10px] text-slate-500 font-medium">Pre-cleared barrier access</p>
+              </div>
+            </div>
+            <button className="text-[10px] font-bold text-slate-400 hover:text-teal-600 transition uppercase tracking-widest">Help</button>
           </div>
         </div>
+      </div>
 
-      </main>
+      {/* ── MODALS ── */}
 
-      {/* ── 2. Bachs "Add Funds" Modal ──────────────────────────── */}
+      {/* 1. Add Funds Modal */}
       {isAddFundsOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-slate-100 space-y-6 animate-in fade-in zoom-in-95 duration-150">
-            {/* Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="space-y-0.5">
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-teal-50 border border-teal-100 text-[10px] font-bold text-[#004B4F]">
-                  <Zap className="w-3 h-3 fill-current" />
-                  <span>Instant Top-Up</span>
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-[2rem] max-w-md w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-8 space-y-8">
+              <div className="flex items-start justify-between">
+                <div className="space-y-1">
+                  <h3 className="text-2xl font-black text-slate-900 tracking-tight leading-tight">Fund Transit Credits</h3>
+                  <p className="text-xs text-slate-500 font-medium">Credits are used for intra-estate electric vehicle fares.</p>
                 </div>
-                <h3 className="text-base font-bold text-slate-900 pt-1">
-                  Fund Transit Wallet
-                </h3>
+                <button onClick={() => setIsAddFundsOpen(false)} className="p-2 rounded-full hover:bg-slate-100 transition"><X className="w-5 h-5 text-slate-400" /></button>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsAddFundsOpen(false)}
-                aria-label="Close add funds"
-                className="p-1 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
 
-            <div className="space-y-4">
-              {/* Presets */}
-              <div>
-                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-2">
-                  Select Preset Amount
-                </label>
-                <div className="grid grid-cols-3 gap-2">
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 gap-3">
                   {FUNDING_PRESETS.map((preset) => (
                     <button
                       key={preset}
-                      type="button"
-                      onClick={() => {
-                        setFundAmount(preset);
-                        setCustomFundAmount('');
-                      }}
-                      className={`py-2 rounded-xl font-bold text-xs transition cursor-pointer ${
+                      onClick={() => { setFundAmount(preset); setCustomFundAmount(''); }}
+                      className={`h-16 rounded-2xl flex flex-col items-center justify-center transition border-2 ${
                         effectiveFundingAmount === preset && !customFundAmount
-                          ? 'bg-[#004B4F] text-white shadow-xs'
-                          : 'bg-slate-50 border border-slate-200 text-slate-700 hover:bg-slate-100'
+                          ? 'border-teal-600 bg-teal-50 text-teal-900 shadow-md'
+                          : 'border-slate-100 bg-slate-50 text-slate-600 hover:border-slate-200'
                       }`}
                     >
-                      ₦{preset.toLocaleString()}
+                      <span className="text-sm font-black">{preset.toFixed(1)} hp</span>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter italic">₦{(preset * 537.5).toLocaleString()} NGN</span>
                     </button>
                   ))}
                 </div>
-              </div>
 
-              {/* Custom Input */}
-              <div>
-                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
-                  Or Custom Amount (₦)
-                </label>
-                <div className="flex items-center bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 focus-within:border-[#004B4F] focus-within:bg-white transition">
-                  <span className="text-slate-400 font-bold text-sm mr-2">₦</span>
+                <div className="relative group">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                     <Plus className="w-3.5 h-3.5 text-slate-400" />
+                  </div>
                   <input
                     type="number"
-                    min="100"
-                    step="50"
-                    placeholder="e.g. 3500"
+                    placeholder="Custom hp amount..."
                     value={customFundAmount}
                     onChange={(e) => setCustomFundAmount(e.target.value)}
-                    className="bg-transparent outline-none w-full text-slate-900 font-bold text-sm"
+                    className="w-full h-14 pl-10 pr-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold placeholder:text-slate-400 outline-none focus:bg-white focus:border-teal-500 transition-all"
                   />
                 </div>
-              </div>
 
-              {fundingError && (
-                <div className="flex items-center gap-2 p-3 bg-rose-50 border border-rose-100 rounded-xl text-xs text-rose-600 font-semibold">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{fundingError}</span>
+                {fundingError && <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl text-[11px] font-bold text-rose-600 flex items-center gap-2 animate-shake"><AlertCircle className="w-4 h-4 shrink-0" /><span>{fundingError}</span></div>}
+
+                <div className="p-4 rounded-2xl bg-slate-900 text-white flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-teal-400">
+                      <CreditCard className="w-4 h-4" />
+                    </div>
+                    <span className="text-[11px] font-bold text-slate-400 tracking-wide uppercase">Total Payable</span>
+                  </div>
+                  <span className="text-lg font-black text-teal-400">₦{(effectiveFundingAmount * 537.5).toLocaleString()}</span>
                 </div>
-              )}
 
-              {/* Supported Rails Notice */}
-              <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-                <div className="flex items-center gap-2">
-                  <CreditCard className="w-4 h-4 text-[#004B4F]" />
-                  <span>Powered by Bachs Gateway</span>
-                </div>
-                <span className="font-bold text-slate-700">Cards & Transfers</span>
+                <button
+                  disabled={isProcessingFunding}
+                  onClick={handleInitiateAddFunds}
+                  className="w-full h-16 bg-teal-600 hover:bg-teal-700 text-white rounded-2xl font-black transition active:scale-[0.99] disabled:opacity-50 flex items-center justify-center gap-3 shadow-xl shadow-teal-900/20"
+                >
+                  {isProcessingFunding ? <Loader2 className="w-5 h-5 animate-spin" /> : <><span>Pay with Bachs Secure</span><ArrowRight className="w-5 h-5" /></>}
+                </button>
               </div>
-
-              {/* Submit */}
-              <button
-                type="button"
-                disabled={isProcessingFunding}
-                onClick={handleInitiateAddFunds}
-                className="w-full bg-[#FF7A00] hover:bg-[#e66e00] text-white text-xs font-bold py-3.5 rounded-full transition shadow-md shadow-orange-500/20 active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-              >
-                {isProcessingFunding ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Connecting to Bachs...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Pay ₦{effectiveFundingAmount.toLocaleString()} with Bachs</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </>
-                )}
-              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ── 3. Unified Ride Confirmation & Real-time Dispatch Modal ─── */}
+      {/* 2. Dispatch Terminal Modal */}
       {activeModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-slate-100 space-y-6">
-            
-            {/* Modal Header */}
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <span className={`w-2.5 h-2.5 rounded-full ${modalStage === 'confirming' ? 'bg-amber-500' : 'bg-emerald-500 animate-pulse'}`} />
-                <h3 className="text-sm font-bold text-slate-900">
-                  {modalStage === 'confirming' && 'Confirm Ride & Pay'}
-                  {modalStage === 'searching' && 'Broadcasting to Estate Drivers...'}
-                  {modalStage === 'assigned' && 'Driver Assigned • On Route'}
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white rounded-[2.5rem] max-w-md w-full overflow-hidden shadow-2xl border border-slate-200 flex flex-col animate-in fade-in slide-in-from-bottom-8 duration-300">
+
+            {/* Header Stage */}
+            <div className="p-8 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className={`w-3 h-3 rounded-full ${modalStage === 'confirming' ? 'bg-amber-500' : 'bg-teal-500 animate-pulse'}`} />
+                <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">
+                  {modalStage === 'confirming' && 'Review Request'}
+                  {modalStage === 'searching' && 'Dispatching Fleet'}
+                  {modalStage === 'assigned' && 'Driver Dispatched'}
                 </h3>
               </div>
-              <button
-                type="button"
-                onClick={handleCancelTrip}
-                className="p-1 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <button onClick={handleCancelTrip} className="p-2 rounded-full hover:bg-slate-100 transition"><X className="w-5 h-5 text-slate-400" /></button>
             </div>
 
-            {/* STAGE 1: Confirm Ride & Debit Wallet */}
-            {modalStage === 'confirming' && (
-              <div className="space-y-5">
-                <div className="text-xs text-slate-600 bg-slate-50 p-4 rounded-2xl space-y-2 border border-slate-100">
-                  <div className="flex justify-between items-center pb-2 border-b border-slate-200/60">
-                    <span className="font-bold text-slate-400 uppercase text-[10px]">Service</span>
-                    <span className="font-bold text-slate-900">{serviceType === 'shuttle' ? 'Estate Shuttle' : 'Private EV'}</span>
+            <div className="p-8 space-y-8">
+              {/* STAGE 1: Review */}
+              {modalStage === 'confirming' && (
+                <div className="space-y-8">
+                  <div className="space-y-4">
+                    <div className="relative pl-6 before:absolute before:left-1 before:top-2 before:bottom-2 before:w-px before:bg-slate-200">
+                      <div className="relative mb-6">
+                        <div className="absolute -left-6 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-teal-500 ring-4 ring-teal-50" />
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Pickup</p>
+                        <p className="text-sm font-black text-slate-900 leading-tight">{pickup}</p>
+                      </div>
+                      <div className="relative">
+                        <div className="absolute -left-6 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-orange-500 ring-4 ring-orange-50" />
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Drop-off</p>
+                        <p className="text-sm font-black text-slate-900 leading-tight">{dropoff}</p>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Pickup:</span>
-                    <span className="font-semibold text-slate-800 text-right">{pickup}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Destination:</span>
-                    <span className="font-semibold text-slate-800 text-right">{dropoff}</span>
-                  </div>
-                  <div className="flex justify-between pt-2 border-t border-slate-200/60 text-sm">
-                    <span className="font-bold text-slate-800">Total Fare:</span>
-                    <span className="font-extrabold text-[#004B4F]">{tripFareFormatted}</span>
-                  </div>
-                </div>
 
-                {/* Wallet Payment Method Verification */}
-                <div className="p-4 rounded-2xl bg-teal-50/70 border border-teal-100 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-xl bg-white text-[#004B4F] shadow-xs">
-                      <CreditCard className="w-4 h-4" />
+                  <div className="flex items-center justify-between p-6 bg-slate-50 rounded-[2rem] border border-slate-100">
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Total Fare</p>
+                      <p className="text-2xl font-black text-slate-900 leading-none">{tripFareFormatted}</p>
                     </div>
-                    <div>
-                      <p className="text-xs font-bold text-slate-900">In-App Transit Wallet</p>
-                      <p className="text-[11px] text-slate-500">
-                        Available Balance: ₦{(profile?.wallet_balance ?? 0).toLocaleString('en-NG')}
-                      </p>
-                    </div>
+                    <div className="px-3 py-1.5 rounded-full bg-slate-900 text-white text-[10px] font-black uppercase tracking-tighter italic">FastPass Auth</div>
                   </div>
-                  {hasSufficientBalance ? (
-                    <span className="text-[11px] font-bold text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-full">
-                      Ready
-                    </span>
+
+                  <div className="flex items-center gap-3 p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                    <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-teal-600 shadow-sm"><CreditCard className="w-5 h-5" /></div>
+                    <div className="flex-1 min-w-0">
+                       <p className="text-xs font-bold text-slate-900 leading-none mb-0.5">In-App Credits</p>
+                       <p className="text-[10px] text-slate-500 font-medium italic">Balance: {profile?.wallet_balance.toFixed(1)} hp</p>
+                    </div>
+                    {!hasSufficientBalance && <span className="text-[9px] font-black text-rose-600 bg-rose-50 px-2 py-1 rounded-lg uppercase tracking-tighter">Low Funds</span>}
+                  </div>
+
+                  {!hasSufficientBalance ? (
+                    <button onClick={() => { setActiveModalOpen(false); setIsAddFundsOpen(true); }} className="w-full h-16 bg-slate-100 text-slate-900 rounded-2xl font-black transition hover:bg-slate-200 active:scale-[0.99] flex items-center justify-center gap-2">
+                      <Plus className="w-5 h-5" /> Top Up Wallet to Continue
+                    </button>
                   ) : (
-                    <span className="text-[11px] font-bold text-rose-700 bg-rose-100 px-2.5 py-0.5 rounded-full">
-                      Low Balance
-                    </span>
+                    <button
+                      disabled={isProcessingPayment}
+                      onClick={handleConfirmAndPay}
+                      className="w-full h-16 bg-teal-600 hover:bg-teal-700 text-white rounded-2xl font-black transition active:scale-[0.99] flex items-center justify-center gap-3 shadow-xl shadow-teal-900/20"
+                    >
+                      {isProcessingPayment ? <Loader2 className="w-5 h-5 animate-spin" /> : <><span>Pay & Request Fleet</span><ArrowRight className="w-5 h-5" /></>}
+                    </button>
                   )}
                 </div>
+              )}
 
-                {!hasSufficientBalance ? (
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-rose-600 text-xs">
-                      <AlertCircle className="w-4 h-4 shrink-0" />
-                      <span>You need at least {tripFareFormatted} to book this ride.</span>
+              {/* STAGE 2: Searching */}
+              {modalStage === 'searching' && (
+                <div className="py-12 flex flex-col items-center text-center space-y-8">
+                  <div className="relative h-24 w-24">
+                    <div className="absolute inset-0 rounded-full border-4 border-slate-50 border-t-teal-500 animate-spin" />
+                    <div className="absolute inset-4 rounded-full bg-slate-900 flex items-center justify-center text-teal-400">
+                      <Car className="w-8 h-8" />
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveModalOpen(false);
-                        setIsAddFundsOpen(true);
-                      }}
-                      className="w-full bg-[#004B4F] text-white text-xs font-bold py-3.5 rounded-full shadow-md transition hover:bg-[#00383b] cursor-pointer"
-                    >
-                      Top Up Wallet via Bachs
-                    </button>
                   </div>
-                ) : (
-                  <button
-                    type="button"
-                    disabled={isProcessingPayment}
-                    onClick={handleConfirmAndPay}
-                    className="w-full bg-[#FF7A00] hover:bg-[#e66e00] text-white text-xs font-bold py-3.5 rounded-full transition shadow-md shadow-orange-500/20 active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    {isProcessingPayment ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Debiting Wallet & Notifying Fleet...</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>Confirm & Pay {tripFareFormatted}</span>
-                        <ArrowUpRight className="w-4 h-4" />
-                      </>
-                    )}
-                  </button>
-                )}
-              </div>
-            )}
-
-            {/* STAGE 2: Searching for Fleet EV via Realtime Channel */}
-            {modalStage === 'searching' && (
-              <div className="py-8 text-center space-y-4">
-                <div className="relative w-16 h-16 mx-auto flex items-center justify-center">
-                  <span className="absolute inset-0 rounded-full bg-teal-100 animate-ping opacity-75" />
-                  <div className="w-16 h-16 rounded-full bg-teal-50 border border-teal-200 flex items-center justify-center relative z-10 text-[#004B4F]">
-                    <Zap className="w-7 h-7" />
+                  <div className="space-y-2">
+                    <p className="text-lg font-black text-slate-900 tracking-tight">Broadcasting to Patrol Drivers...</p>
+                    <p className="text-xs text-slate-500 font-medium max-w-[240px] mx-auto">Connecting your request to available electric vehicles in the estate sector.</p>
                   </div>
+                  <button onClick={handleCancelTrip} className="px-6 py-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-rose-500 transition">Cancel Request</button>
                 </div>
-                <div>
-                  <p className="text-sm font-bold text-slate-800">
-                    Payment confirmed. Waiting for driver response...
-                  </p>
-                  <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
-                    Dispatched to active patrol drivers in Golf Estate. Your screen will update the moment a driver accepts.
-                  </p>
-                </div>
-              </div>
-            )}
+              )}
 
-            {/* STAGE 3: Matched & Driver Responded in Realtime */}
-            {modalStage === 'assigned' && assignedDriver && (
-              <div className="space-y-5">
-                <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-100">
-                  <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-full bg-[#004B4F] text-white flex items-center justify-center font-bold text-sm shadow-sm">
+              {/* STAGE 3: Assigned */}
+              {modalStage === 'assigned' && assignedDriver && (
+                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
+                  <div className="flex items-center gap-5 p-6 bg-slate-900 rounded-[2rem] text-white overflow-hidden relative">
+                    <div className="w-16 h-16 rounded-2xl bg-teal-400 text-slate-900 flex items-center justify-center text-2xl font-black shadow-lg shadow-teal-400/20 relative z-10">
                       {assignedDriver.name.charAt(0)}
                     </div>
-                    <div>
-                      <h4 className="text-sm font-bold text-slate-900">{assignedDriver.name}</h4>
-                      <p className="text-xs text-slate-500">{assignedDriver.cabNumber} • Zero-Emission EV</p>
+                    <div className="relative z-10 space-y-1">
+                      <h4 className="text-xl font-black tracking-tight">{assignedDriver.name}</h4>
+                      <p className="text-[11px] text-teal-400 font-bold uppercase tracking-widest leading-none">{assignedDriver.cabNumber}</p>
+                    </div>
+                    <div className="absolute top-0 right-0 p-6 opacity-20"><Zap className="w-16 h-16" /></div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-6 rounded-3xl bg-slate-50 border border-slate-100 flex flex-col items-center gap-1 text-center">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">ETA</p>
+                      <p className="text-2xl font-black text-slate-900 leading-none">{assignedDriver.eta}</p>
+                    </div>
+                    <div className="p-6 rounded-3xl bg-orange-50 border border-orange-100 flex flex-col items-center gap-1 text-center">
+                      <p className="text-[10px] font-bold text-orange-400 uppercase tracking-widest leading-none">Gate PIN</p>
+                      <p className="text-2xl font-black text-orange-600 font-mono tracking-widest leading-none">{assignedDriver.securityPin}</p>
                     </div>
                   </div>
 
-                  <a
-                    href={`tel:${assignedDriver.phone}`}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-xs"
-                  >
-                    <Phone className="w-3.5 h-3.5" />
-                    <span>Call</span>
-                  </a>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="p-3.5 rounded-2xl bg-teal-50 border border-teal-100 text-center">
-                    <span className="text-[10px] font-bold text-teal-800 uppercase tracking-wider block">
-                      ETA
-                    </span>
-                    <span className="text-lg font-black text-[#004B4F]">{assignedDriver.eta}</span>
-                  </div>
-                  <div className="p-3.5 rounded-2xl bg-orange-50 border border-orange-100 text-center">
-                    <span className="text-[10px] font-bold text-[#FF7A00] uppercase tracking-wider block">
-                      Security PIN
-                    </span>
-                    <span className="text-lg font-black text-slate-900 tracking-widest font-mono">
-                      {assignedDriver.securityPin}
-                    </span>
+                  <div className="flex gap-3">
+                    <a href={`tel:${assignedDriver.phone}`} className="flex-1 h-16 bg-white border-2 border-slate-100 rounded-2xl flex items-center justify-center gap-2 font-black text-slate-900 hover:bg-slate-50 transition active:scale-[0.98]">
+                      <Phone className="w-5 h-5 text-teal-600" /> Call Driver
+                    </a>
+                    <button onClick={() => router.push('/dashboard/rides')} className="flex-1 h-16 bg-slate-900 text-white rounded-2xl flex items-center justify-center gap-2 font-black hover:bg-black transition active:scale-[0.98]">
+                      <Navigation className="w-5 h-5" /> Track Live
+                    </button>
                   </div>
                 </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs px-3 py-2 rounded-xl bg-slate-50 border border-slate-100">
-                    <span className="text-slate-500">Payment Status:</span>
-                    <span className="font-bold text-emerald-700 inline-flex items-center gap-1">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> {tripFareFormatted} Paid
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 p-2.5 rounded-xl">
-                    <ShieldCheck className="w-4 h-4 shrink-0 text-emerald-600" />
-                    <span>Gatehouse barrier clearance pre-authorized</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Cancel / Dismiss Button */}
-            <button
-              type="button"
-              onClick={handleCancelTrip}
-              className="w-full text-center text-xs font-semibold text-slate-400 hover:text-rose-500 py-1 transition cursor-pointer"
-            >
-              {modalStage === 'assigned' ? 'Dismiss / Close View' : 'Cancel Request'}
-            </button>
+              )}
+            </div>
           </div>
         </div>
       )}

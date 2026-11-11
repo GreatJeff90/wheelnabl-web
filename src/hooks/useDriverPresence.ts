@@ -7,6 +7,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 export interface ActiveDriverState {
   driverId: string;
   fullName: string;
+<<<<<<< HEAD
   phone: string;
   badgeNumber: string;
   sector: string;
@@ -15,10 +16,19 @@ export interface ActiveDriverState {
   battery: number;
   lat?: number;
   lng?: number;
+=======
+  phone?: string;
+  badgeNumber?: string;
+  sector?: string;
+  cabNumber?: string;
+  isOnline: boolean;
+  battery?: number;
+>>>>>>> f3e5972a8d5ee6cd148b7c8afb14664e618b3c20
   updatedAt: string;
 }
 
 /**
+<<<<<<< HEAD
  * Realtime driver presence & online state management.
  *
  * Driver mode (`mode = 'driver'`):
@@ -30,6 +40,18 @@ export interface ActiveDriverState {
  *  - Subscribes to `estate_driver_presence` channel presence states.
  *  - Combines real-time presence with a initial query to `profiles` where `role = 'driver'`.
  *  - Deduplicates and returns an array of currently active online drivers.
+=======
+ * Realtime driver presence & online status management using Supabase Realtime Presence.
+ *
+ * Driver mode (`mode = 'driver'`):
+ *  - Broadcasts the local driver's presence state (online/offline, sector, cab info)
+ *    to the `estate_driver_presence` Realtime presence channel.
+ *
+ * Resident mode (`mode = 'resident'`):
+ *  - Subscribes to `estate_driver_presence` channel presence state.
+ *  - Tracks joining/leaving drivers in real time.
+ *  - Provides `onlineDrivers` array and `onlineCount`.
+>>>>>>> f3e5972a8d5ee6cd148b7c8afb14664e618b3c20
  */
 export function useDriverPresence(
   mode: 'resident' | 'driver',
@@ -47,6 +69,7 @@ export function useDriverPresence(
       const driverId = localDriverData.driverId;
       const isOnline = localDriverData.isOnline ?? true;
 
+<<<<<<< HEAD
       // 1. Update Postgres profile so persistent queries pick up the online status
       supabase
         .from('profiles')
@@ -63,6 +86,9 @@ export function useDriverPresence(
         });
 
       // 2. Setup Supabase Realtime Presence Channel for sub-second presence sync
+=======
+      // Create Presence channel for sub-second presence broadcast across clients
+>>>>>>> f3e5972a8d5ee6cd148b7c8afb14664e618b3c20
       const channel = supabase.channel('estate_driver_presence', {
         config: {
           presence: {
@@ -78,12 +104,20 @@ export function useDriverPresence(
           const payload: ActiveDriverState = {
             driverId,
             fullName: localDriverData.fullName || 'Fleet Driver',
+<<<<<<< HEAD
             phone: localDriverData.phone || '+234 810 000 0000',
+=======
+            phone: localDriverData.phone || '+234 800 000 0000',
+>>>>>>> f3e5972a8d5ee6cd148b7c8afb14664e618b3c20
             badgeNumber: localDriverData.badgeNumber || 'WNB-DRV-084',
             sector: localDriverData.sector || 'Golf Estate Patrol Sector',
             cabNumber: localDriverData.cabNumber || 'EV Cab #04',
             isOnline,
+<<<<<<< HEAD
             battery: localDriverData.battery ?? 82,
+=======
+            battery: localDriverData.battery ?? 85,
+>>>>>>> f3e5972a8d5ee6cd148b7c8afb14664e618b3c20
             updatedAt: new Date().toISOString(),
           };
 
@@ -105,18 +139,27 @@ export function useDriverPresence(
       };
     } else {
       // mode === 'resident'
+<<<<<<< HEAD
       // 1. First fetch drivers from database
+=======
+      // Load initial drivers from profiles (selecting safely available columns)
+>>>>>>> f3e5972a8d5ee6cd148b7c8afb14664e618b3c20
       async function loadInitialDrivers() {
         try {
           const { data, error } = await supabase
             .from('profiles')
+<<<<<<< HEAD
             .select('id, full_name, phone, badge_number, estate_zone, is_online')
             .eq('role', 'driver');
+=======
+            .select('id, full_name, badge_number');
+>>>>>>> f3e5972a8d5ee6cd148b7c8afb14664e618b3c20
 
           if (!error && data && active) {
             const mapped: ActiveDriverState[] = data.map((d, index) => ({
               driverId: d.id,
               fullName: d.full_name || `Driver #${index + 1}`,
+<<<<<<< HEAD
               phone: d.phone || '+234 810 000 0000',
               badgeNumber: d.badge_number || `WNB-DRV-08${index + 1}`,
               sector: d.estate_zone || 'Phase 1 Gatehouse',
@@ -130,12 +173,31 @@ export function useDriverPresence(
           }
         } catch (e) {
           console.error('Failed to load initial online drivers:', e);
+=======
+              badgeNumber: d.badge_number || `WNB-DRV-08${index + 1}`,
+              sector: 'Phase 1 & Clubhouse Sector',
+              cabNumber: `EV Cab #${String(index + 1).padStart(2, '0')}`,
+              isOnline: true,
+              battery: 80 + ((index * 5) % 20),
+              updatedAt: new Date().toISOString(),
+            }));
+
+            // If presence state hasn't populated yet, provide baseline initial drivers
+            setOnlineDrivers((prev) => (prev.length === 0 ? mapped : prev));
+          }
+        } catch (e) {
+          console.error('Failed to load initial profiles for driver presence:', e);
+>>>>>>> f3e5972a8d5ee6cd148b7c8afb14664e618b3c20
         }
       }
 
       loadInitialDrivers();
 
+<<<<<<< HEAD
       // 2. Subscribe to Presence state on the channel
+=======
+      // Subscribe to Presence channel state
+>>>>>>> f3e5972a8d5ee6cd148b7c8afb14664e618b3c20
       const channel = supabase.channel('estate_driver_presence');
       channelRef.current = channel;
 
@@ -205,5 +267,10 @@ export function useDriverPresence(
     localDriverData?.battery,
   ]);
 
+<<<<<<< HEAD
   return { onlineDrivers };
 }
+=======
+  return { onlineDrivers, onlineCount: onlineDrivers.length };
+}
+>>>>>>> f3e5972a8d5ee6cd148b7c8afb14664e618b3c20
