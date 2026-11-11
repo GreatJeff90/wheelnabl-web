@@ -121,7 +121,7 @@ export default function DriverRidesPage() {
       serviceType: row.service_type === 'private' ? 'Private EV' : 'Estate Shuttle',
       pickup: row.pickup,
       dropoff: row.dropoff,
-      fare: `₦${Number(row.fare).toLocaleString()}`,
+      fare: `${Number(row.fare).toFixed(1)} hp`,
       rawFare: Number(row.fare),
       status: mappedStatus,
       securityPin: row.security_pin || '4821',
