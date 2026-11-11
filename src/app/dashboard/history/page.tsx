@@ -20,7 +20,7 @@ import {
   Inbox,
   ArrowRight,
   History,
-  Search,
+  Search, MapPin, Navigation,
 } from 'lucide-react';
 
 interface RideDbRow {
