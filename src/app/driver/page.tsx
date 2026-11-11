@@ -297,7 +297,7 @@ export default function DriverDashboardPage() {
                          {activeTrip.status === 'incoming' && (
                             <div className="grid grid-cols-2 gap-3">
                                <button onClick={() => setActiveTrip(null)} className="h-16 rounded-2xl border-2 border-slate-100 font-black text-slate-400 hover:bg-slate-50 transition">Decline</button>
-                               <button onClick={handleAcceptTrip} className="h-16 rounded-2xl bg-teal-600 text-white font-black hover:bg-teal-700 transition shadow-xl shadow-teal-900/20">Accept Request</button>
+                               <button onClick={handleAcceptTrip} className="h-16 rounded-2xl bg-teal-600 text-white font-black hover:bg-teal-700 transition shadow-xl shadow-teal-900/20">Accept</button>
                             </div>
                          )}
                          {activeTrip.status === 'accepted' && (
