@@ -94,7 +94,12 @@ export default function DashboardPage() {
 
   // Add Funds State
   const [isAddFundsOpen, setIsAddFundsOpen] = useState(false);
+<<<<<<< HEAD
+  const { onlineDrivers } = useDriverPresence('resident');
+  const [fundAmount, setFundAmount] = useState<number>(1000);
+=======
   const [fundAmount, setFundAmount] = useState<number>(5.0);
+>>>>>>> f3e5972a8d5ee6cd148b7c8afb14664e618b3c20
   const [customFundAmount, setCustomFundAmount] = useState<string>('');
   const [isProcessingFunding, setIsProcessingFunding] = useState(false);
   const [fundingError, setFundingError] = useState<string | null>(null);
@@ -277,6 +282,27 @@ export default function DashboardPage() {
           </div>
         </div>
 
+<<<<<<< HEAD
+        {/* Intra-Estate Booking Form */}
+        <div className="bg-white border border-slate-100 rounded-3xl p-6 sm:p-8 space-y-6 shadow-xl shadow-slate-200/50">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-lg font-bold text-slate-900">Book Estate Ride</h3>
+              <div className="flex items-center gap-2 mt-0.5">
+                <p className="text-xs text-slate-500">
+                  Dispatch an intra-estate electric vehicle to your coordinates
+                </p>
+                {onlineDrivers.length > 0 && (
+                  <>
+                    <span className="text-slate-300">•</span>
+                    <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      {onlineDrivers.length} Online
+                    </span>
+                  </>
+                )}
+              </div>
+=======
         <div className="flex items-center gap-3 bg-white p-2 rounded-2xl border border-slate-100 shadow-sm self-start md:self-auto">
           <div className="px-4 py-2">
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Wallet Balance</p>
@@ -302,6 +328,7 @@ export default function DashboardPage() {
             <div className="space-y-1">
               <h2 className="text-xl font-bold text-slate-900">Book Estate Transit</h2>
               <p className="text-xs text-slate-500">Zero-emission electric vehicle dispatch</p>
+>>>>>>> f3e5972a8d5ee6cd148b7c8afb14664e618b3c20
             </div>
 
             {/* Mode Switcher */}
