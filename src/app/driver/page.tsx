@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { useDriverPresence } from '@/hooks/useDriverPresence';
+import { playDispatchChime, requestNotificationPermission, sendPushNotification } from '@/lib/notifications';
 import {
   Wallet,
   MapPin,
@@ -129,6 +130,13 @@ export default function DriverDashboardPage() {
           pickup: newOrder.pickup, dropoff: newOrder.dropoff, fare: Number(newOrder.fare),
           serviceType: newOrder.service_type === 'private' ? 'Private EV' : 'Shuttle', distance: '1.2 km', status: 'incoming',
         });
+        // Incoming ride: audible chime + browser push so the driver is alerted
+        // even when the cockpit tab is backgrounded.
+        playDispatchChime();
+        void sendPushNotification(
+          'Incoming Ride Request',
+          `${newOrder.passenger_name || 'A resident'} is requesting a ride. Open the cockpit to accept.`,
+        );
       }
     }).subscribe();
     channelRef.current = channel;
@@ -176,6 +184,16 @@ export default function DriverDashboardPage() {
     } catch (err: any) { setWithdrawError(err.message); setIsProcessingWithdraw(false); }
   };
 
+  const handleToggleOnline = async () => {
+    if (isOnline) {
+      setIsOnline(false);
+      return;
+    }
+    // Going online: ask for notification permission (user gesture), then arm the cockpit.
+    await requestNotificationPermission();
+    setIsOnline(true);
+  };
+
   if (loading) return <div className="flex h-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-teal-600" /></div>;
 
   return (
@@ -189,7 +207,7 @@ export default function DriverDashboardPage() {
                 <Power className={`w-10 h-10 ${isOnline ? 'animate-pulse' : ''}`} />
              </div>
              <button
-                onClick={() => setIsOnline(!isOnline)}
+                onClick={handleToggleOnline}
                 className={`absolute -bottom-2 -right-2 h-10 px-4 rounded-full font-black text-[10px] uppercase tracking-widest border-4 border-slate-50 transition-all ${isOnline ? 'bg-rose-500 text-white' : 'bg-emerald-600 text-white'}`}
              >
                 {isOnline ? 'Off-Duty' : 'On-Duty'}
